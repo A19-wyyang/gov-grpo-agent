@@ -30,7 +30,11 @@ def score_trajectory(case, trajectory):
         if tool_name in called:
             verifier_score += VERIFIER_WEIGHTS[weight_name]
 
-    if trajectory.get("final_answer") == case["hidden_truth"]["final_decision"]:
+    final_answer = trajectory.get("final_answer", "")
+    if not isinstance(final_answer, str):
+        failure_reasons.append("final_answer:not_string")
+
+    if final_answer == case["hidden_truth"]["final_decision"]:
         verifier_score += VERIFIER_WEIGHTS["final_decision"]
     else:
         failure_reasons.append("final_decision:mismatch")
@@ -59,7 +63,7 @@ def score_trajectory(case, trajectory):
         penalty += 0.30
         failure_reasons.append("premature_submit:missing_slots")
 
-    judge_score = _judge_final_answer(trajectory.get("final_answer", ""))
+    judge_score = _judge_final_answer(final_answer)
     reward = max(0.0, min(1.0, 0.85 * verifier_score + 0.15 * judge_score - penalty))
     return {
         "case_id": case["case_id"],
@@ -88,6 +92,8 @@ def _is_premature_submit(case, called):
 
 
 def _judge_final_answer(final_answer):
+    if not isinstance(final_answer, str):
+        return 0.0
     if not final_answer:
         return 0.0
     completeness = 1.0 if any(word in final_answer for word in ["符合", "不符合", "材料", "补充"]) else 0.6

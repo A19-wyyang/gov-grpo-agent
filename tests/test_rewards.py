@@ -68,3 +68,43 @@ class RewardTests(unittest.TestCase):
 
         self.assertGreaterEqual(report["penalty"], 0.3)
         self.assertIn("premature_submit:missing_slots", report["failure_reasons"])
+
+    def test_reward_handles_non_string_final_answer_without_crashing(self):
+        case = build_case("housing_fund", 23, "simple_success")
+        trajectory = {
+            "case_id": case["case_id"],
+            "rollout_id": "manual_bool_answer",
+            "steps": [
+                {
+                    "turn": 1,
+                    "action": "Policy_Search",
+                    "arguments": {},
+                    "observation": {},
+                },
+                {
+                    "turn": 2,
+                    "action": "Eligibility_Check",
+                    "arguments": {},
+                    "observation": {},
+                },
+                {
+                    "turn": 3,
+                    "action": "Material_Check",
+                    "arguments": {},
+                    "observation": {},
+                },
+                {
+                    "turn": 4,
+                    "action": "Submit",
+                    "arguments": {"final_answer": True},
+                    "observation": {"final_answer": True},
+                },
+            ],
+            "final_answer": True,
+            "metadata": {"path_type": case["path_type"], "difficulty": case["difficulty"]},
+        }
+
+        report = score_trajectory(case, trajectory)
+
+        self.assertEqual(report["judge_score"], 0.0)
+        self.assertIn("final_answer:not_string", report["failure_reasons"])
