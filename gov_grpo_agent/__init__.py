@@ -10,6 +10,7 @@ __all__ = [
     "model_policy",
     "normalization",
     "packaging",
+    "parallel_rollout",
     "rewards",
     "runtime",
     "schemas",

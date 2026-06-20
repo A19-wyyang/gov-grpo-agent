@@ -136,12 +136,33 @@ tail -f artifacts/model_rollout/model_trajectories.jsonl
 也可以按 case 分片多卡并行。例如 8 张卡各跑 25 个 case：
 
 ```bash
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu0 --case-offset 0 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu1 --case-offset 25 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=2 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu2 --case-offset 50 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=3 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu3 --case-offset 75 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu4 --case-offset 100 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=5 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu5 --case-offset 125 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=6 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu6 --case-offset 150 --case-count 25 --rollout-group-size 4 --max-turns 8
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=7 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu7 --case-offset 175 --case-count 25 --rollout-group-size 4 --max-turns 8
+python -m gov_grpo_agent.parallel_rollout \
+  --gpus 0,1,2,3,4,5,6,7 \
+  --total-cases 200 \
+  --model-name-or-path Qwen/Qwen3-8B \
+  --adapter-path artifacts/qwen3_8b_sft_lora \
+  --output-root artifacts/parallel_model_rollout \
+  --rollout-group-size 4 \
+  --max-turns 8
+```
+
+先只打印将要启动的 worker 命令，不真正运行：
+
+```bash
+python -m gov_grpo_agent.parallel_rollout \
+  --gpus 0,1,2,3,4,5,6,7 \
+  --total-cases 200 \
+  --dry-run
+```
+
+查看所有 worker 日志：
+
+```bash
+tail -f artifacts/parallel_model_rollout/gpu*/rollout.log
+```
+
+查看每个分片已完成的 trajectory 数：
+
+```bash
+watch -n 2 'for d in artifacts/parallel_model_rollout/gpu*; do echo -n "$d "; test -f "$d/model_trajectories.jsonl" && wc -l "$d/model_trajectories.jsonl" || echo 0; done'
 ```
