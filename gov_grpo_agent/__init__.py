@@ -5,6 +5,7 @@ __all__ = [
     "data",
     "evaluation",
     "grpo",
+    "infer_sft",
     "packaging",
     "rewards",
     "runtime",

@@ -97,3 +97,12 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 python -m gov_grpo_agent.train_sft \
 ```
 
 如果你的环境能访问或已经下载了 `Qwen/Qwen3-8B-Instruct`，可把 `--model-name-or-path` 改成该模型 ID 或本地模型目录。第一轮目标是让模型学会合法 JSON 动作、工具调用顺序和追问逻辑，不追求最终效果最大化。
+
+训练后验证 LoRA adapter 是否能输出合法动作 JSON：
+
+```bash
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.infer_sft \
+  --model-name-or-path Qwen/Qwen3-8B \
+  --adapter-path artifacts/qwen3_8b_sft_lora \
+  --query "我想提取公积金交房租，应该怎么办？"
+```
