@@ -70,6 +70,47 @@ def generate_action(model_name_or_path, adapter_path, user_query, max_new_tokens
     }
 
 
+class SftActionGenerator:
+    def __init__(self, model_name_or_path, adapter_path, max_new_tokens=256):
+        configure_4090_nccl_environment()
+        import torch
+        from peft import PeftModel
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        self.max_new_tokens = max_new_tokens
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            adapter_path,
+            trust_remote_code=True,
+            use_fast=True,
+        )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        base_model = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path,
+            trust_remote_code=True,
+            dtype=torch.bfloat16,
+            device_map="auto",
+        )
+        self.model = PeftModel.from_pretrained(base_model, adapter_path)
+        self.model.eval()
+        self.torch = torch
+
+    def generate(self, prompt):
+        inference_prompt = build_inference_prompt(prompt)
+        inputs = self.tokenizer(inference_prompt, return_tensors="pt").to(self.model.device)
+        with self.torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+                pad_token_id=self.tokenizer.pad_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+            )
+        generated_ids = outputs[0][inputs["input_ids"].shape[-1] :]
+        generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=False)
+        return parse_action_from_generation(generated_text)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate Qwen SFT LoRA action generation.")
     parser.add_argument("--model-name-or-path", default="Qwen/Qwen3-8B")

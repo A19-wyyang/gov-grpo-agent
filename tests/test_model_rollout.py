@@ -1,0 +1,57 @@
+import json
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from gov_grpo_agent.model_rollout import run_model_rollout
+
+
+class CyclingGenerator:
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, prompt):
+        self.calls += 1
+        index = (self.calls - 1) % 4
+        if index == 0:
+            return {
+                "action": "Policy_Search",
+                "arguments": {
+                    "service_item": "住房公积金提取",
+                    "city": "杭州",
+                    "query": "租房提取条件 材料",
+                },
+            }
+        if index == 1:
+            return {"action": "Eligibility_Check", "arguments": {}}
+        if index == 2:
+            return {"action": "Material_Check", "arguments": {}}
+        return {"action": "Submit", "arguments": {"final_answer": "placeholder"}}
+
+
+class ModelRolloutTests(unittest.TestCase):
+    def test_run_model_rollout_writes_model_trajectory_outputs(self):
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "model_rollout"
+
+            summary = run_model_rollout(
+                action_generator=CyclingGenerator(),
+                output_dir=output_dir,
+                case_count=3,
+                rollout_group_size=1,
+            )
+
+            self.assertEqual(summary["cases"], 3)
+            self.assertEqual(summary["trajectories"], 3)
+            self.assertEqual(summary["grpo_groups"], 3)
+            self.assertTrue((output_dir / "model_trajectories.jsonl").exists())
+            self.assertTrue((output_dir / "model_reward_reports.jsonl").exists())
+            self.assertTrue((output_dir / "model_grpo_groups.json").exists())
+            self.assertTrue((output_dir / "model_metrics.json").exists())
+
+            first = json.loads(
+                (output_dir / "model_trajectories.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()[0]
+            )
+            self.assertEqual(first["steps"][0]["arguments"]["service_item"], "租房提取公积金")

@@ -106,3 +106,23 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_a
   --adapter-path artifacts/qwen3_8b_sft_lora \
   --query "我想提取公积金交房租，应该怎么办？"
 ```
+
+单条推理通过后，生成真实模型 rollout、reward、GRPO group 和指标：
+
+```bash
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.model_rollout \
+  --model-name-or-path Qwen/Qwen3-8B \
+  --adapter-path artifacts/qwen3_8b_sft_lora \
+  --output-dir artifacts/model_rollout \
+  --case-count 200 \
+  --rollout-group-size 4 \
+  --max-turns 8
+```
+
+输出文件包括：
+
+- `artifacts/model_rollout/model_trajectories.jsonl`
+- `artifacts/model_rollout/model_reward_reports.jsonl`
+- `artifacts/model_rollout/model_grpo_groups.json`
+- `artifacts/model_rollout/model_metrics.json`
+- `artifacts/model_rollout/model_summary.json`

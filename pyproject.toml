@@ -14,6 +14,7 @@ gov-grpo-mvp = "gov_grpo_agent.cli:main"
 gov-grpo-package = "gov_grpo_agent.packaging:main"
 gov-grpo-train-sft = "gov_grpo_agent.train_sft:main"
 gov-grpo-infer-sft = "gov_grpo_agent.infer_sft:main"
+gov-grpo-model-rollout = "gov_grpo_agent.model_rollout:main"
 
 [tool.setuptools.packages.find]
 include = ["gov_grpo_agent*"]
