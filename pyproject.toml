@@ -12,6 +12,7 @@ dependencies = []
 [project.scripts]
 gov-grpo-mvp = "gov_grpo_agent.cli:main"
 gov-grpo-package = "gov_grpo_agent.packaging:main"
+gov-grpo-train-sft = "gov_grpo_agent.train_sft:main"
 
 [tool.setuptools.packages.find]
 include = ["gov_grpo_agent*"]

@@ -10,5 +10,6 @@ __all__ = [
     "runtime",
     "schemas",
     "sft",
+    "train_sft",
     "tools",
 ]

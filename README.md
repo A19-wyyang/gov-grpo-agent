@@ -61,3 +61,39 @@ python -m gov_grpo_agent.cli --output-dir artifacts/mvp --case-count 200 --rollo
 - 将 `grpo_groups.json` 接入 TRL GRPOTrainer、verl 或 OpenRLHF。
 - 用 vLLM/SGLang 替换 `RuleBasedPolicy`，批量采样真实模型 rollout。
 - 将 mock Policy DB 扩展为结构化政策库，后续再加入 BM25/BGE/FAISS 检索。
+
+## Qwen3-8B SFT 起步命令
+
+服务器建议先创建 Python 3.11 环境并安装训练依赖：
+
+```bash
+conda create -n govagent python=3.11 -y
+conda activate govagent
+
+pip install --upgrade pip
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install transformers datasets accelerate peft trl bitsandbytes sentencepiece protobuf einops
+```
+
+先生成 MVP SFT 数据：
+
+```bash
+python -m gov_grpo_agent.cli --output-dir artifacts/mvp --case-count 200 --rollout-group-size 4
+```
+
+再用 Qwen3-8B 做第一轮 QLoRA SFT。你的服务器有 4 张 48GB 4090，建议先只使用 GPU 4-7：
+
+```bash
+CUDA_VISIBLE_DEVICES=4,5,6,7 python -m gov_grpo_agent.train_sft \
+  --model-name-or-path Qwen/Qwen3-8B \
+  --train-file artifacts/mvp/sft_samples.jsonl \
+  --output-dir artifacts/qwen3_8b_sft_lora \
+  --max-seq-length 2048 \
+  --per-device-train-batch-size 1 \
+  --gradient-accumulation-steps 16 \
+  --learning-rate 2e-4 \
+  --num-train-epochs 1 \
+  --lora-rank 16
+```
+
+如果你的环境能访问或已经下载了 `Qwen/Qwen3-8B-Instruct`，可把 `--model-name-or-path` 改成该模型 ID 或本地模型目录。第一轮目标是让模型学会合法 JSON 动作、工具调用顺序和追问逻辑，不追求最终效果最大化。
