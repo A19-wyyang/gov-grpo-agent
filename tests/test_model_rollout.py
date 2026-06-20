@@ -1,5 +1,6 @@
 import json
 import unittest
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -55,3 +56,27 @@ class ModelRolloutTests(unittest.TestCase):
                 .splitlines()[0]
             )
             self.assertEqual(first["steps"][0]["arguments"]["service_item"], "租房提取公积金")
+
+    def test_run_model_rollout_supports_case_offset_and_progress_logging(self):
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "model_rollout"
+            progress = StringIO()
+
+            summary = run_model_rollout(
+                action_generator=CyclingGenerator(),
+                output_dir=output_dir,
+                case_count=2,
+                rollout_group_size=1,
+                case_offset=3,
+                progress_stream=progress,
+            )
+
+            self.assertEqual(summary["case_offset"], 3)
+            self.assertEqual(summary["cases"], 2)
+            self.assertIn("[rollout] 1/2", progress.getvalue())
+            self.assertIn("[rollout] 2/2", progress.getvalue())
+
+            lines = (output_dir / "model_trajectories.jsonl").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 2)
+            first = json.loads(lines[0])
+            self.assertEqual(first["case_id"], "talent_subsidy_0004")

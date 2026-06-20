@@ -126,3 +126,22 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_a
 - `artifacts/model_rollout/model_grpo_groups.json`
 - `artifacts/model_rollout/model_metrics.json`
 - `artifacts/model_rollout/model_summary.json`
+
+`model_rollout` 会输出类似 `[rollout] 12/800 case=...` 的进度日志，并且每条 trajectory 完成后立即追加到 JSONL。可另开终端观察：
+
+```bash
+tail -f artifacts/model_rollout/model_trajectories.jsonl
+```
+
+也可以按 case 分片多卡并行。例如 8 张卡各跑 25 个 case：
+
+```bash
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=0 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu0 --case-offset 0 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=1 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu1 --case-offset 25 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=2 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu2 --case-offset 50 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=3 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu3 --case-offset 75 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu4 --case-offset 100 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=5 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu5 --case-offset 125 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=6 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu6 --case-offset 150 --case-count 25 --rollout-group-size 4 --max-turns 8
+NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=7 python -m gov_grpo_agent.model_rollout --model-name-or-path Qwen/Qwen3-8B --adapter-path artifacts/qwen3_8b_sft_lora --output-dir artifacts/model_rollout_gpu7 --case-offset 175 --case-count 25 --rollout-group-size 4 --max-turns 8
+```
