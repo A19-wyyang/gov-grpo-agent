@@ -52,7 +52,10 @@ class AgentRuntime:
                 }
             )
             if action["action"] in {"Submit", "Refuse"}:
-                final_answer = action["arguments"]["final_answer"]
+                final_answer = action["arguments"].setdefault("final_answer", "")
+                steps[-1]["arguments"]["final_answer"] = final_answer
+                if isinstance(steps[-1]["observation"], dict):
+                    steps[-1]["observation"].setdefault("final_answer", final_answer)
                 break
         else:
             final_answer = "超过最大轮次，办理轨迹失败。"

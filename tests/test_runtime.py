@@ -31,3 +31,15 @@ class RuntimeTests(unittest.TestCase):
                 build_case("housing_fund", 12, "simple_success"),
                 {"action": "Answer_Directly", "arguments": {}},
             )
+
+    def test_runtime_handles_terminal_action_missing_final_answer(self):
+        class MissingFinalAnswerPolicy:
+            def next_action(self, case, steps):
+                return {"action": "Submit", "arguments": {}}
+
+        trajectory = AgentRuntime(policy=MissingFinalAnswerPolicy(), max_turns=1).run_case(
+            build_case("housing_fund", 13, "simple_success")
+        )
+
+        self.assertEqual(trajectory["final_answer"], "")
+        self.assertEqual(trajectory["steps"][0]["arguments"]["final_answer"], "")
