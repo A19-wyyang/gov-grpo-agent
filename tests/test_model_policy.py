@@ -1,7 +1,7 @@
 import unittest
 
 from gov_grpo_agent.data import build_case
-from gov_grpo_agent.model_policy import ModelActionPolicy
+from gov_grpo_agent.model_policy import ModelActionPolicy, build_policy_prompt
 from gov_grpo_agent.runtime import AgentRuntime
 
 
@@ -61,3 +61,32 @@ class ModelPolicyTests(unittest.TestCase):
 
         self.assertIn(case["service_item"], generator.queries[0])
         self.assertIn(case["user_initial_query"], generator.queries[0])
+
+    def test_policy_prompt_lists_required_and_remaining_tools(self):
+        case = build_case("housing_fund", 3, "simple_success")
+        steps = [{"action": "Policy_Search", "observation": {}}]
+
+        prompt = build_policy_prompt(case, steps)
+
+        self.assertIn("必要工具", prompt)
+        self.assertIn("剩余必要工具", prompt)
+        self.assertIn("Eligibility_Check", prompt)
+        self.assertIn("Material_Check", prompt)
+        self.assertIn("禁止 Submit/Refuse", prompt)
+
+    def test_model_policy_can_enforce_remaining_required_tools_before_submit(self):
+        case = build_case("housing_fund", 4, "simple_success")
+        generator = FakeActionGenerator(
+            [
+                {
+                    "action": "Submit",
+                    "arguments": {"final_answer": "过早提交"},
+                }
+            ]
+        )
+        steps = [{"action": "Policy_Search", "observation": {}}]
+
+        action = ModelActionPolicy(generator, enforce_required_tools=True).next_action(case, steps)
+
+        self.assertEqual(action["action"], "Eligibility_Check")
+        self.assertEqual(action["arguments"], {})

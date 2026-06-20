@@ -15,7 +15,10 @@ def run_model_rollout(action_generator, output_dir, case_count=200, rollout_grou
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     cases = build_mvp_cases(limit=case_count)
-    runtime = AgentRuntime(policy=ModelActionPolicy(action_generator), max_turns=max_turns)
+    runtime = AgentRuntime(
+        policy=ModelActionPolicy(action_generator, enforce_required_tools=True),
+        max_turns=max_turns,
+    )
 
     trajectories = []
     reward_reports = {}
