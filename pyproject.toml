@@ -16,6 +16,7 @@ gov-grpo-train-sft = "gov_grpo_agent.train_sft:main"
 gov-grpo-infer-sft = "gov_grpo_agent.infer_sft:main"
 gov-grpo-model-rollout = "gov_grpo_agent.model_rollout:main"
 gov-grpo-parallel-rollout = "gov_grpo_agent.parallel_rollout:main"
+gov-grpo-merge-rollout-shards = "gov_grpo_agent.merge_rollout_shards:main"
 
 [tool.setuptools.packages.find]
 include = ["gov_grpo_agent*"]

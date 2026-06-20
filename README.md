@@ -166,3 +166,18 @@ tail -f artifacts/parallel_model_rollout/gpu*/rollout.log
 ```bash
 watch -n 2 'for d in artifacts/parallel_model_rollout/gpu*; do echo -n "$d "; test -f "$d/model_trajectories.jsonl" && wc -l "$d/model_trajectories.jsonl" || echo 0; done'
 ```
+
+所有分片完成后，合并 8 个 worker 的结果：
+
+```bash
+python -m gov_grpo_agent.merge_rollout_shards \
+  --input-root artifacts/parallel_model_rollout \
+  --output-dir artifacts/model_rollout_merged
+```
+
+合并后查看全局指标：
+
+```bash
+cat artifacts/model_rollout_merged/model_summary.json
+cat artifacts/model_rollout_merged/model_metrics.json
+```

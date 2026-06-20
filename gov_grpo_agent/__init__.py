@@ -6,6 +6,7 @@ __all__ = [
     "evaluation",
     "grpo",
     "infer_sft",
+    "merge_rollout_shards",
     "model_rollout",
     "model_policy",
     "normalization",
