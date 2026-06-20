@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gov-grpo-agent"
+version = "0.1.0"
+description = "MVP framework for a GRPO-optimized government-service agent."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+gov-grpo-mvp = "gov_grpo_agent.cli:main"
+gov-grpo-package = "gov_grpo_agent.packaging:main"
+
+[tool.setuptools.packages.find]
+include = ["gov_grpo_agent*"]
