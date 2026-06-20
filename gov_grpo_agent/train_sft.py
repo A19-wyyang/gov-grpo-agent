@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,13 @@ class SftTrainingConfig:
     load_in_4bit: bool = True
 
 
+def configure_4090_nccl_environment(env=None):
+    target_env = os.environ if env is None else env
+    target_env.setdefault("NCCL_P2P_DISABLE", "1")
+    target_env.setdefault("NCCL_IB_DISABLE", "1")
+    return target_env
+
+
 def format_chatml_sample(sample):
     parts = []
     for message in sample["messages"]:
@@ -44,7 +52,17 @@ def load_sft_jsonl(path):
     return records
 
 
+def tokenize_text_batch(tokenizer, batch, max_seq_length):
+    return tokenizer(
+        batch["text"],
+        truncation=True,
+        max_length=max_seq_length,
+        padding=False,
+    )
+
+
 def train(config):
+    configure_4090_nccl_environment()
     # Heavy training dependencies are imported lazily so tests and data generation
     # still run on machines without GPU training stacks installed.
     import torch
@@ -107,14 +125,7 @@ def train(config):
     model = get_peft_model(model, lora_config)
 
     def tokenize(batch):
-        tokenized = tokenizer(
-            batch["text"],
-            truncation=True,
-            max_length=config.max_seq_length,
-            padding=False,
-        )
-        tokenized["labels"] = list(tokenized["input_ids"])
-        return tokenized
+        return tokenize_text_batch(tokenizer, batch, config.max_seq_length)
 
     tokenized_dataset = dataset.map(
         tokenize,
