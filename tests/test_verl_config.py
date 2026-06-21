@@ -26,6 +26,7 @@ class VerlConfigTests(unittest.TestCase):
             self.assertIn("- console", text)
             self.assertIn("custom_reward_function:", text)
             self.assertIn("path: gov_grpo_agent/verl_reward.py", text)
+            self.assertEqual(config["custom_reward_function"], {"path": None, "name": None})
             self.assertIn("reward_model:", text)
             self.assertIn("num_workers: null", text)
             self.assertIn("reward_manager: null", text)

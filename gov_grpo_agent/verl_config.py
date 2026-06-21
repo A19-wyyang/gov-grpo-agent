@@ -28,6 +28,10 @@ def build_verl_grpo_config(
                 "name": reward_name,
             }
         },
+        "custom_reward_function": {
+            "path": None,
+            "name": None,
+        },
         "reward_model": {
             "num_workers": None,
             "reward_manager": None,
