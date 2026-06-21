@@ -43,6 +43,57 @@ class VerlDataTests(unittest.TestCase):
             self.assertTrue(report_path.exists())
             self.assertEqual(report["best_reward"], 0.9)
 
+    def test_convert_grpo_jsonl_to_verl_parquet_serializes_mixed_trajectory_extra_info(self):
+        with TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "grpo.jsonl"
+            output_path = Path(temp_dir) / "train.parquet"
+            input_path.write_text(
+                json.dumps(
+                    {
+                        "case_id": "case_1",
+                        "prompt": "用户要办理公积金提取",
+                        "responses": [
+                            {
+                                "rollout_id": "r1",
+                                "trajectory": [
+                                    {
+                                        "action": "Ask_User",
+                                        "arguments": {"slots": ["city"]},
+                                        "observation": {"filled_slots": {"city": "杭州"}},
+                                    }
+                                ],
+                            },
+                            {
+                                "rollout_id": "r2",
+                                "trajectory": [
+                                    {
+                                        "action": "Material_Check",
+                                        "arguments": {"ready": True},
+                                        "observation": {"missing": [], "complete": True},
+                                    }
+                                ],
+                            },
+                        ],
+                        "rewards": [0.8, 0.2],
+                        "advantages": [1.0, -1.0],
+                        "reward_mean": 0.5,
+                        "reward_std": 0.3,
+                        "low_variance": False,
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            convert_grpo_jsonl_to_verl_parquet(input_path, output_path)
+
+            import pandas as pd
+
+            row = pd.read_parquet(output_path).iloc[0]
+            self.assertIsInstance(row["extra_info"]["responses_json"], str)
+            self.assertIn('"rollout_id": "r1"', row["extra_info"]["responses_json"])
+
     def test_convert_grpo_jsonl_to_verl_parquet_rejects_all_low_variance_data(self):
         with TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "grpo.jsonl"

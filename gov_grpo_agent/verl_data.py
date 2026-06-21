@@ -30,9 +30,10 @@ def convert_grpo_jsonl_to_verl_parquet(input_path, output_path, report_path=None
                 },
                 "extra_info": {
                     "case_id": group["case_id"],
-                    "responses": responses,
-                    "rewards": rewards,
-                    "advantages": advantages,
+                    "responses_json": json.dumps(responses, ensure_ascii=False),
+                    "rewards_json": json.dumps(rewards, ensure_ascii=False),
+                    "advantages_json": json.dumps(advantages, ensure_ascii=False),
+                    "responses_count": len(responses),
                     "reward_mean": group.get("reward_mean"),
                     "reward_std": group.get("reward_std"),
                 },
@@ -87,7 +88,7 @@ def _write_parquet(rows, output):
 
 def _build_report(groups, rows, output):
     total_responses = sum(len(group.get("responses", [])) for group in groups)
-    usable_response_count = sum(len(row["extra_info"]["responses"]) for row in rows)
+    usable_response_count = sum(int(row["extra_info"].get("responses_count", 0)) for row in rows)
     low_variance_groups = sum(1 for group in groups if _is_low_variance(group))
     reward_values = [
         float(reward)
