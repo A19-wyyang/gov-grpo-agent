@@ -26,6 +26,8 @@ class VerlConfigTests(unittest.TestCase):
             self.assertIn("- console", text)
             self.assertIn("custom_reward_function:", text)
             self.assertIn("path: gov_grpo_agent/verl_reward.py", text)
+            self.assertIn("reward_model:", text)
+            self.assertIn("num_workers: null", text)
 
     def test_build_verl_grpo_command_points_to_main_ppo_and_config(self):
         command = build_verl_grpo_command("configs/verl_grpo_qwen3_8b.yaml")

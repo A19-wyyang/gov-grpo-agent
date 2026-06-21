@@ -28,6 +28,9 @@ def build_verl_grpo_config(
                 "name": reward_name,
             }
         },
+        "reward_model": {
+            "num_workers": None,
+        },
         "data": {
             "train_files": train_files,
             "val_files": val_files,
@@ -134,6 +137,8 @@ def _to_yaml(value, indent=0):
 
 
 def _format_scalar(value):
+    if value is None:
+        return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):

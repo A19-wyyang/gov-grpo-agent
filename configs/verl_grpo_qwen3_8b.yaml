@@ -6,6 +6,8 @@ reward:
   custom_reward_function:
     path: gov_grpo_agent/verl_reward.py
     name: compute_score
+reward_model:
+  num_workers: null
 data:
   train_files: artifacts/verl_grpo_job/data/train.parquet
   val_files: artifacts/verl_grpo_job/data/train.parquet
