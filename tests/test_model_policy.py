@@ -90,3 +90,19 @@ class ModelPolicyTests(unittest.TestCase):
 
         self.assertEqual(action["action"], "Eligibility_Check")
         self.assertEqual(action["arguments"], {})
+
+    def test_model_policy_can_enforce_missing_slots_before_submit(self):
+        case = build_case("housing_fund", 5, "missing_information")
+        generator = FakeActionGenerator(
+            [
+                {
+                    "action": "Submit",
+                    "arguments": {"final_answer": "过早提交"},
+                }
+            ]
+        )
+
+        action = ModelActionPolicy(generator, enforce_required_tools=True).next_action(case, [])
+
+        self.assertEqual(action["action"], "Ask_User")
+        self.assertEqual(action["arguments"]["slots"], ["city"])

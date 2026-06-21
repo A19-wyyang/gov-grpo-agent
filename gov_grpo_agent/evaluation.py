@@ -1,3 +1,6 @@
+from gov_grpo_agent.decision import evaluate_final_decision
+
+
 def compute_metrics(cases, trajectories, reward_reports):
     case_by_id = {case["case_id"]: case for case in cases}
     report_by_rollout = {report["rollout_id"]: report for report in reward_reports}
@@ -21,7 +24,7 @@ def compute_metrics(cases, trajectories, reward_reports):
             missing_tool_trajectories += 1
         if "Material_Check" in called:
             material_check_calls += 1
-        if trajectory.get("final_answer") == case["hidden_truth"]["final_decision"]:
+        if evaluate_final_decision(case, trajectory.get("final_answer"))["correct"]:
             final_decision_correct += 1
         if case["hidden_truth"]["missing_slots"] and "Ask_User" not in called and (
             "Submit" in called or "Refuse" in called

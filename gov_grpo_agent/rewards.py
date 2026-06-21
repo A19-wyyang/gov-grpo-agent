@@ -1,3 +1,5 @@
+from gov_grpo_agent.decision import evaluate_final_decision
+
 VERIFIER_WEIGHTS = {
     "slot_completion": 0.15,
     "policy_search": 0.10,
@@ -34,10 +36,12 @@ def score_trajectory(case, trajectory):
     if not isinstance(final_answer, str):
         failure_reasons.append("final_answer:not_string")
 
-    if final_answer == case["hidden_truth"]["final_decision"]:
+    decision_result = evaluate_final_decision(case, final_answer)
+    if decision_result["correct"]:
         verifier_score += VERIFIER_WEIGHTS["final_decision"]
     else:
         failure_reasons.append("final_decision:mismatch")
+        failure_reasons.extend(decision_result["failure_reasons"])
 
     material_observation = _last_observation(steps, "Material_Check")
     if material_observation is not None and material_observation.get("missing", []) == case["hidden_truth"]["missing_materials"]:

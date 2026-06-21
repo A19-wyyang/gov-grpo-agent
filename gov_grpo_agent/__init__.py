@@ -3,6 +3,7 @@
 __all__ = [
     "cli",
     "data",
+    "decision",
     "evaluation",
     "grpo",
     "infer_sft",

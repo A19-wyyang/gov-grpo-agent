@@ -46,3 +46,28 @@ class EvaluationTests(unittest.TestCase):
 
         self.assertEqual(metrics["required_tool_recall"], 0.0)
         self.assertEqual(metrics["missing_tool_rate"], 1.0)
+
+    def test_compute_metrics_uses_structured_final_decision_accuracy(self):
+        case = build_mvp_cases(limit=1)[0]
+        trajectory = {
+            "case_id": case["case_id"],
+            "rollout_id": "semantic",
+            "steps": [
+                {"turn": 1, "action": "Policy_Search", "arguments": {}, "observation": {}},
+                {"turn": 2, "action": "Eligibility_Check", "arguments": {}, "observation": {}},
+                {"turn": 3, "action": "Material_Check", "arguments": {}, "observation": {}},
+                {
+                    "turn": 4,
+                    "action": "Submit",
+                    "arguments": {"final_answer": "符合办理条件，材料齐全，可提交申请。"},
+                    "observation": {},
+                },
+            ],
+            "final_answer": "符合办理条件，材料齐全，可提交申请。",
+            "metadata": {"path_type": case["path_type"], "difficulty": case["difficulty"]},
+        }
+        report = score_trajectory(case, trajectory)
+
+        metrics = compute_metrics([case], [trajectory], [report])
+
+        self.assertEqual(metrics["final_decision_accuracy"], 1.0)

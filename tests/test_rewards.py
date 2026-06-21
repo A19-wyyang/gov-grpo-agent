@@ -108,3 +108,14 @@ class RewardTests(unittest.TestCase):
 
         self.assertEqual(report["judge_score"], 0.0)
         self.assertIn("final_answer:not_string", report["failure_reasons"])
+
+    def test_reward_accepts_semantically_correct_final_decision(self):
+        case = build_case("housing_fund", 24, "simple_success")
+        trajectory = AgentRuntime(policy=RuleBasedPolicy()).run_case(case)
+        trajectory["final_answer"] = "您符合租房提取公积金条件，材料齐全，可提交申请。"
+        trajectory["steps"][-1]["arguments"]["final_answer"] = trajectory["final_answer"]
+
+        report = score_trajectory(case, trajectory)
+
+        self.assertGreaterEqual(report["verifier_score"], 0.9)
+        self.assertNotIn("final_decision:mismatch", report["failure_reasons"])

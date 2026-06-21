@@ -40,9 +40,12 @@ def build_policy_prompt(case, steps):
 
 
 def enforce_required_tool_order(case, steps, action):
+    called_actions = [step["action"] for step in steps]
+    missing_slots = case["hidden_truth"]["missing_slots"]
+    if missing_slots and "Ask_User" not in called_actions:
+        return {"action": "Ask_User", "arguments": {"slots": list(missing_slots)}}
     if action["action"] not in {"Submit", "Refuse"}:
         return action
-    called_actions = [step["action"] for step in steps]
     for tool_name in case["hidden_truth"]["required_tools"]:
         if tool_name not in called_actions:
             if tool_name == "Policy_Search":
