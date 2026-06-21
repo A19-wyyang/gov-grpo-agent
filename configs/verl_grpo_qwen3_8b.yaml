@@ -8,6 +8,7 @@ reward:
     name: compute_score
 reward_model:
   num_workers: null
+  reward_manager: null
 data:
   train_files: artifacts/verl_grpo_job/data/train.parquet
   val_files: artifacts/verl_grpo_job/data/train.parquet
