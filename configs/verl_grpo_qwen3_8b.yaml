@@ -9,6 +9,7 @@ reward:
 reward_model:
   num_workers: null
   reward_manager: null
+  reward_loop_source: null
 data:
   train_files: artifacts/verl_grpo_job/data/train.parquet
   val_files: artifacts/verl_grpo_job/data/train.parquet
