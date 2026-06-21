@@ -31,6 +31,6 @@ class VerlConfigTests(unittest.TestCase):
         command = build_verl_grpo_command("configs/verl_grpo_qwen3_8b.yaml")
 
         self.assertEqual(command[0:3], ["python3", "-m", "verl.trainer.main_ppo"])
-        self.assertIn("--config-path", command)
-        self.assertIn("configs", command)
+        self.assertIn("--config-dir", command)
+        self.assertTrue(command[command.index("--config-dir") + 1].endswith("configs"))
         self.assertEqual(command[-2:], ["--config-name", "verl_grpo_qwen3_8b"])

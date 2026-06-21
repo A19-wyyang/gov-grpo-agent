@@ -104,8 +104,8 @@ def build_verl_grpo_command(config_path):
         "python3",
         "-m",
         "verl.trainer.main_ppo",
-        "--config-path",
-        path.parent.as_posix() or ".",
+        "--config-dir",
+        path.parent.resolve().as_posix(),
         "--config-name",
         path.stem,
     ]

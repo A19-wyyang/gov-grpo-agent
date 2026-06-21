@@ -13,7 +13,7 @@ def prepare_verl_training_job(
     n_rollout=4,
     total_epochs=1,
 ):
-    root = Path(work_dir)
+    root = Path(work_dir).resolve()
     data_dir = root / "data"
     config_dir = root / "configs"
     save_dir = root / "checkpoints"
@@ -32,10 +32,10 @@ def prepare_verl_training_job(
     write_verl_grpo_config(
         output_path=config_path,
         model_path=model_path,
-        train_files=str(train_parquet),
-        val_files=str(train_parquet),
-        save_dir=str(save_dir),
-        reward_path="gov_grpo_agent/verl_reward.py",
+        train_files=str(train_parquet.resolve()),
+        val_files=str(train_parquet.resolve()),
+        save_dir=str(save_dir.resolve()),
+        reward_path=str((Path.cwd() / "gov_grpo_agent" / "verl_reward.py").resolve()),
         reward_name="compute_score",
         n_rollout=n_rollout,
         total_epochs=total_epochs,
