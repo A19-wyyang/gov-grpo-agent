@@ -116,7 +116,10 @@ NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_a
   --output-dir artifacts/model_rollout \
   --case-count 200 \
   --rollout-group-size 4 \
-  --max-turns 8
+  --max-turns 8 \
+  --do-sample \
+  --temperature 1.0 \
+  --top-p 0.9
 ```
 
 输出文件包括：
@@ -143,7 +146,10 @@ python -m gov_grpo_agent.parallel_rollout \
   --adapter-path artifacts/qwen3_8b_sft_lora \
   --output-root artifacts/parallel_model_rollout \
   --rollout-group-size 4 \
-  --max-turns 8
+  --max-turns 8 \
+  --do-sample \
+  --temperature 1.0 \
+  --top-p 0.9
 ```
 
 先只打印将要启动的 worker 命令，不真正运行：
@@ -198,3 +204,5 @@ python -m gov_grpo_agent.prepare_grpo \
 - `usable_groups`：reward 有方差、可提供组内相对优势信号的 group 数
 - `low_variance_groups`：组内 reward 全相同或近似相同的 group 数
 - `avg_reward`：平均 reward
+
+如果 `usable_groups = 0`，说明同一个 case 的多条 rollout 没有 reward 差异，GRPO 没有相对优势信号。优先提高采样多样性，例如使用 `--do-sample --temperature 1.0 --top-p 0.9` 重新生成 rollout；不要把低方差 group 强行当作有效 GRPO 数据。

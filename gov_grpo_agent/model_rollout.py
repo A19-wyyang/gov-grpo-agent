@@ -12,6 +12,9 @@ from gov_grpo_agent.rewards import score_trajectory
 from gov_grpo_agent.runtime import AgentRuntime
 
 
+MODEL_ACTION_ERRORS = (ValueError, KeyError, TypeError)
+
+
 def run_model_rollout(
     action_generator,
     output_dir,
@@ -53,7 +56,10 @@ def run_model_rollout(
                 rollout_index,
                 rollout_group_size,
             )
-            trajectory = runtime.run_case(case, rollout_id=rollout_id)
+            try:
+                trajectory = runtime.run_case(case, rollout_id=rollout_id)
+            except MODEL_ACTION_ERRORS as exc:
+                trajectory = _invalid_model_generation_trajectory(case, rollout_id, exc)
             _repair_placeholder_final_answer(case, trajectory)
             report = score_trajectory(case, trajectory)
             trajectories.append(trajectory)
@@ -97,6 +103,31 @@ def _repair_placeholder_final_answer(case, trajectory):
         trajectory["steps"][-1]["observation"]["final_answer"] = trajectory["final_answer"]
 
 
+def _invalid_model_generation_trajectory(case, rollout_id, exc):
+    return {
+        "case_id": case["case_id"],
+        "rollout_id": rollout_id,
+        "steps": [
+            {
+                "turn": 1,
+                "action": "",
+                "arguments": {},
+                "observation": {
+                    "error": str(exc),
+                    "error_type": exc.__class__.__name__,
+                },
+            }
+        ],
+        "final_answer": "模型动作解析失败，办理轨迹失败。",
+        "metadata": {
+            "path_type": case["path_type"],
+            "difficulty": case["difficulty"],
+            "error_type": case["error_type"],
+            "model_error": exc.__class__.__name__,
+        },
+    }
+
+
 def _write_jsonl(path, rows):
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
@@ -127,12 +158,19 @@ def main(argv=None):
     parser.add_argument("--rollout-group-size", type=int, default=4)
     parser.add_argument("--max-turns", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument("--do-sample", action="store_true", default=True)
+    parser.add_argument("--no-sample", action="store_false", dest="do_sample")
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--top-p", type=float, default=0.9)
     args = parser.parse_args(argv)
 
     generator = SftActionGenerator(
         model_name_or_path=args.model_name_or_path,
         adapter_path=args.adapter_path,
         max_new_tokens=args.max_new_tokens,
+        do_sample=args.do_sample,
+        temperature=args.temperature,
+        top_p=args.top_p,
     )
     summary = run_model_rollout(
         action_generator=generator,

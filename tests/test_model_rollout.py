@@ -30,6 +30,11 @@ class CyclingGenerator:
         return {"action": "Submit", "arguments": {"final_answer": "placeholder"}}
 
 
+class BrokenGenerator:
+    def generate(self, prompt):
+        raise ValueError("no JSON object found")
+
+
 class ModelRolloutTests(unittest.TestCase):
     def test_run_model_rollout_writes_model_trajectory_outputs(self):
         with TemporaryDirectory() as temp_dir:
@@ -80,3 +85,24 @@ class ModelRolloutTests(unittest.TestCase):
             self.assertEqual(len(lines), 2)
             first = json.loads(lines[0])
             self.assertEqual(first["case_id"], "talent_subsidy_0004")
+
+    def test_run_model_rollout_records_invalid_model_generation_without_crashing(self):
+        with TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "model_rollout"
+
+            summary = run_model_rollout(
+                action_generator=BrokenGenerator(),
+                output_dir=output_dir,
+                case_count=1,
+                rollout_group_size=1,
+            )
+
+            self.assertEqual(summary["trajectories"], 1)
+            self.assertEqual(summary["metrics"]["invalid_action_rate"], 1.0)
+            trajectory = json.loads(
+                (output_dir / "model_trajectories.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()[0]
+            )
+            self.assertEqual(trajectory["steps"][0]["action"], "")
+            self.assertIn("no JSON object found", trajectory["steps"][0]["observation"]["error"])

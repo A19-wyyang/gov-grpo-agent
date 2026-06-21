@@ -44,6 +44,9 @@ def build_worker_commands(
     output_root,
     rollout_group_size,
     max_turns,
+    do_sample=True,
+    temperature=1.0,
+    top_p=0.9,
     python_executable=None,
 ):
     executable = python_executable or sys.executable
@@ -75,7 +78,15 @@ def build_worker_commands(
             str(rollout_group_size),
             "--max-turns",
             str(max_turns),
+            "--temperature",
+            str(temperature),
+            "--top-p",
+            str(top_p),
         ]
+        if do_sample:
+            args.append("--do-sample")
+        else:
+            args.append("--no-sample")
         commands.append(
             WorkerCommand(
                 gpu_id=shard.gpu_id,
@@ -123,6 +134,10 @@ def main(argv=None):
     parser.add_argument("--output-root", default="artifacts/parallel_model_rollout")
     parser.add_argument("--rollout-group-size", type=int, default=4)
     parser.add_argument("--max-turns", type=int, default=8)
+    parser.add_argument("--do-sample", action="store_true", default=True)
+    parser.add_argument("--no-sample", action="store_false", dest="do_sample")
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
@@ -134,6 +149,9 @@ def main(argv=None):
         output_root=Path(args.output_root),
         rollout_group_size=args.rollout_group_size,
         max_turns=args.max_turns,
+        do_sample=args.do_sample,
+        temperature=args.temperature,
+        top_p=args.top_p,
     )
     launched = launch_workers(commands, dry_run=args.dry_run)
     print(json.dumps(launched, ensure_ascii=False, indent=2))

@@ -44,3 +44,21 @@ class ParallelRolloutTests(unittest.TestCase):
         self.assertIn("--case-count", first.args)
         self.assertIn("25", first.args)
         self.assertIn("artifacts/parallel_rollout/gpu4", first.args)
+
+    def test_build_worker_commands_include_sampling_parameters(self):
+        commands = build_worker_commands(
+            gpu_ids=[0],
+            total_cases=4,
+            model_name_or_path="Qwen/Qwen3-8B",
+            adapter_path="adapter",
+            output_root=Path("rollouts"),
+            rollout_group_size=4,
+            max_turns=8,
+            temperature=1.1,
+            top_p=0.92,
+        )
+
+        args = commands[0].args
+        self.assertIn("--do-sample", args)
+        self.assertEqual(args[args.index("--temperature") + 1], "1.1")
+        self.assertEqual(args[args.index("--top-p") + 1], "0.92")

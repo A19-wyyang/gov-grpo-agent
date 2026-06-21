@@ -71,13 +71,24 @@ def generate_action(model_name_or_path, adapter_path, user_query, max_new_tokens
 
 
 class SftActionGenerator:
-    def __init__(self, model_name_or_path, adapter_path, max_new_tokens=256):
+    def __init__(
+        self,
+        model_name_or_path,
+        adapter_path,
+        max_new_tokens=256,
+        do_sample=False,
+        temperature=1.0,
+        top_p=0.9,
+    ):
         configure_4090_nccl_environment()
         import torch
         from peft import PeftModel
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.max_new_tokens = max_new_tokens
+        self.do_sample = do_sample
+        self.temperature = temperature
+        self.top_p = top_p
         self.tokenizer = AutoTokenizer.from_pretrained(
             adapter_path,
             trust_remote_code=True,
@@ -98,13 +109,19 @@ class SftActionGenerator:
     def generate(self, prompt):
         inference_prompt = build_inference_prompt(prompt)
         inputs = self.tokenizer(inference_prompt, return_tensors="pt").to(self.model.device)
+        generation_kwargs = {
+            "max_new_tokens": self.max_new_tokens,
+            "do_sample": self.do_sample,
+            "pad_token_id": self.tokenizer.pad_token_id,
+            "eos_token_id": self.tokenizer.eos_token_id,
+        }
+        if self.do_sample:
+            generation_kwargs["temperature"] = self.temperature
+            generation_kwargs["top_p"] = self.top_p
         with self.torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=self.max_new_tokens,
-                do_sample=False,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
+                **generation_kwargs,
             )
         generated_ids = outputs[0][inputs["input_ids"].shape[-1] :]
         generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=False)
