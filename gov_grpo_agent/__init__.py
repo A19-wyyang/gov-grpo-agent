@@ -13,6 +13,7 @@ __all__ = [
     "normalization",
     "packaging",
     "parallel_rollout",
+    "prepare_grpo",
     "rewards",
     "runtime",
     "schemas",

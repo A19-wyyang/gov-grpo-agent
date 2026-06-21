@@ -181,3 +181,20 @@ python -m gov_grpo_agent.merge_rollout_shards \
 cat artifacts/model_rollout_merged/model_summary.json
 cat artifacts/model_rollout_merged/model_metrics.json
 ```
+
+准备框架无关的 GRPO 训练 JSONL 和质量报告：
+
+```bash
+python -m gov_grpo_agent.prepare_grpo \
+  --input artifacts/model_rollout_merged_v3/model_grpo_groups.json \
+  --output artifacts/grpo_train/qwen3_grpo_train.jsonl \
+  --report artifacts/grpo_train/qwen3_grpo_report.json
+```
+
+报告字段包括：
+
+- `groups`：case group 数量
+- `responses`：总 rollout 数量
+- `usable_groups`：reward 有方差、可提供组内相对优势信号的 group 数
+- `low_variance_groups`：组内 reward 全相同或近似相同的 group 数
+- `avg_reward`：平均 reward
