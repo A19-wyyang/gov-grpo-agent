@@ -36,6 +36,9 @@ def build_verl_grpo_config(
             "num_workers": None,
             "reward_manager": None,
             "reward_loop_source": None,
+            "model": {
+                "path": None,
+            },
         },
         "data": {
             "train_files": train_files,

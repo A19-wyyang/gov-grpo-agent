@@ -31,6 +31,7 @@ class VerlConfigTests(unittest.TestCase):
             self.assertIn("num_workers: null", text)
             self.assertIn("reward_manager: null", text)
             self.assertIn("reward_loop_source: null", text)
+            self.assertEqual(config["reward_model"]["model"]["path"], None)
 
     def test_build_verl_grpo_command_points_to_main_ppo_and_config(self):
         command = build_verl_grpo_command("configs/verl_grpo_qwen3_8b.yaml")
