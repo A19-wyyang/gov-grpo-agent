@@ -206,3 +206,44 @@ python -m gov_grpo_agent.prepare_grpo \
 - `avg_reward`：平均 reward
 
 如果 `usable_groups = 0`，说明同一个 case 的多条 rollout 没有 reward 差异，GRPO 没有相对优势信号。优先提高采样多样性，例如使用 `--do-sample --temperature 1.0 --top-p 0.9` 重新生成 rollout；不要把低方差 group 强行当作有效 GRPO 数据。
+
+## verl GRPO 训练与可视化
+
+准备 sampled GRPO JSONL 后，生成 verl 训练 job：
+
+```bash
+python -m gov_grpo_agent.train_grpo_verl \
+  --input-jsonl artifacts/grpo_train/qwen3_grpo_train_sampled.jsonl \
+  --work-dir artifacts/verl_grpo_qwen3_8b \
+  --model-path Qwen/Qwen3-8B \
+  --n-rollout 4 \
+  --total-epochs 1
+```
+
+运行 verl：
+
+```bash
+bash artifacts/verl_grpo_qwen3_8b/run_verl_grpo.sh
+```
+
+生成本地 HTML/CSV 指标报告：
+
+```bash
+python -m gov_grpo_agent.metrics_report \
+  --metrics artifacts/model_rollout_sampled_merged/model_metrics.json artifacts/verl_grpo_qwen3_8b/data/data_report.json \
+  --grpo-report artifacts/grpo_train/qwen3_grpo_report_sampled.json \
+  --output-dir artifacts/reports/qwen3_grpo \
+  --title "Qwen3-8B GRPO Metrics"
+```
+
+导出 TensorBoard event：
+
+```bash
+python -m gov_grpo_agent.tensorboard_export \
+  --metrics artifacts/model_rollout_sampled_merged/model_metrics.json artifacts/verl_grpo_qwen3_8b/data/data_report.json \
+  --log-dir artifacts/tensorboard/qwen3_grpo
+
+tensorboard --logdir artifacts/tensorboard/qwen3_grpo --host 0.0.0.0 --port 6006
+```
+
+详细说明见 `docs/verl_grpo_training.md`。

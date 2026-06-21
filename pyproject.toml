@@ -18,6 +18,11 @@ gov-grpo-model-rollout = "gov_grpo_agent.model_rollout:main"
 gov-grpo-parallel-rollout = "gov_grpo_agent.parallel_rollout:main"
 gov-grpo-merge-rollout-shards = "gov_grpo_agent.merge_rollout_shards:main"
 gov-grpo-prepare = "gov_grpo_agent.prepare_grpo:main"
+gov-grpo-verl-data = "gov_grpo_agent.verl_data:main"
+gov-grpo-verl-config = "gov_grpo_agent.verl_config:main"
+gov-grpo-train-verl = "gov_grpo_agent.train_grpo_verl:main"
+gov-grpo-metrics-report = "gov_grpo_agent.metrics_report:main"
+gov-grpo-tensorboard-export = "gov_grpo_agent.tensorboard_export:main"
 
 [tool.setuptools.packages.find]
 include = ["gov_grpo_agent*"]

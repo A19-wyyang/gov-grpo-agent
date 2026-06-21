@@ -61,6 +61,7 @@ class ModelRolloutTests(unittest.TestCase):
                 .splitlines()[0]
             )
             self.assertEqual(first["steps"][0]["arguments"]["service_item"], "租房提取公积金")
+            self.assertIn("用户诉求", first["prompt"])
 
     def test_run_model_rollout_supports_case_offset_and_progress_logging(self):
         with TemporaryDirectory() as temp_dir:

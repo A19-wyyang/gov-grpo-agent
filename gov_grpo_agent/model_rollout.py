@@ -7,7 +7,7 @@ from gov_grpo_agent.data import build_mvp_cases
 from gov_grpo_agent.evaluation import compute_metrics
 from gov_grpo_agent.grpo import build_grpo_groups
 from gov_grpo_agent.infer_sft import SftActionGenerator
-from gov_grpo_agent.model_policy import ModelActionPolicy
+from gov_grpo_agent.model_policy import ModelActionPolicy, build_policy_prompt
 from gov_grpo_agent.rewards import score_trajectory
 from gov_grpo_agent.runtime import AgentRuntime
 
@@ -60,6 +60,7 @@ def run_model_rollout(
                 trajectory = runtime.run_case(case, rollout_id=rollout_id)
             except MODEL_ACTION_ERRORS as exc:
                 trajectory = _invalid_model_generation_trajectory(case, rollout_id, exc)
+            trajectory["prompt"] = build_policy_prompt(case, [])
             _repair_placeholder_final_answer(case, trajectory)
             report = score_trajectory(case, trajectory)
             trajectories.append(trajectory)

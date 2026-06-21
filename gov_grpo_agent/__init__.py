@@ -18,6 +18,12 @@ __all__ = [
     "runtime",
     "schemas",
     "sft",
+    "metrics_report",
+    "tensorboard_export",
+    "train_grpo_verl",
     "train_sft",
     "tools",
+    "verl_config",
+    "verl_data",
+    "verl_reward",
 ]
