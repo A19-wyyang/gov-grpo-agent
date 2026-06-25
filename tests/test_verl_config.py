@@ -31,7 +31,16 @@ class VerlConfigTests(unittest.TestCase):
             self.assertIn("num_workers: null", text)
             self.assertIn("reward_manager: null", text)
             self.assertIn("reward_loop_source: null", text)
+            self.assertEqual(config["reward_model"]["reward_loop_module_path"], None)
+            self.assertEqual(config["reward_model"]["reward_loop_class_name"], None)
+            self.assertEqual(config["reward_model"]["enable"], None)
+            self.assertEqual(config["reward_model"]["enable_resource_pool"], None)
+            self.assertEqual(config["reward_model"]["n_gpus_per_node"], None)
+            self.assertEqual(config["reward_model"]["nnodes"], None)
+            self.assertEqual(config["reward_model"]["reward_kwargs"], None)
             self.assertEqual(config["reward_model"]["model"]["path"], None)
+            self.assertEqual(config["reward_model"]["rollout"]["name"], None)
+            self.assertEqual(config["sandbox_fusion"], {"url": None, "max_concurrent": None})
 
     def test_build_verl_grpo_command_points_to_main_ppo_and_config(self):
         command = build_verl_grpo_command("configs/verl_grpo_qwen3_8b.yaml")

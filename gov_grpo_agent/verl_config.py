@@ -32,12 +32,26 @@ def build_verl_grpo_config(
             "path": None,
             "name": None,
         },
+        "sandbox_fusion": {
+            "url": None,
+            "max_concurrent": None,
+        },
         "reward_model": {
             "num_workers": None,
             "reward_manager": None,
             "reward_loop_source": None,
+            "reward_loop_module_path": None,
+            "reward_loop_class_name": None,
+            "enable": None,
+            "enable_resource_pool": None,
+            "n_gpus_per_node": None,
+            "nnodes": None,
+            "reward_kwargs": None,
             "model": {
                 "path": None,
+            },
+            "rollout": {
+                "name": None,
             },
         },
         "data": {

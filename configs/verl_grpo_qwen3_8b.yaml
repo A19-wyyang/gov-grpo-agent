@@ -9,12 +9,24 @@ reward:
 custom_reward_function:
   path: null
   name: null
+sandbox_fusion:
+  url: null
+  max_concurrent: null
 reward_model:
   num_workers: null
   reward_manager: null
   reward_loop_source: null
+  reward_loop_module_path: null
+  reward_loop_class_name: null
+  enable: null
+  enable_resource_pool: null
+  n_gpus_per_node: null
+  nnodes: null
+  reward_kwargs: null
   model:
     path: null
+  rollout:
+    name: null
 data:
   train_files: artifacts/verl_grpo_job/data/train.parquet
   val_files: artifacts/verl_grpo_job/data/train.parquet
