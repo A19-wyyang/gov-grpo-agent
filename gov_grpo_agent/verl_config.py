@@ -80,6 +80,7 @@ def build_verl_grpo_config(
                 "temperature": 1.0,
                 "top_p": 0.9,
                 "gpu_memory_utilization": 0.75,
+                "log_prob_micro_batch_size_per_gpu": 1,
             },
             "ref": {
                 "log_prob_micro_batch_size_per_gpu": 1,
@@ -148,6 +149,7 @@ def build_verl_grpo_command(config):
         "actor_rollout_ref.rollout.temperature",
         "actor_rollout_ref.rollout.top_p",
         "actor_rollout_ref.rollout.gpu_memory_utilization",
+        "actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu",
         "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu",
         "trainer.project_name",
         "trainer.experiment_name",

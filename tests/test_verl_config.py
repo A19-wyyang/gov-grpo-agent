@@ -74,6 +74,7 @@ class VerlConfigTests(unittest.TestCase):
                     "temperature": 1.0,
                     "top_p": 0.9,
                     "gpu_memory_utilization": 0.75,
+                    "log_prob_micro_batch_size_per_gpu": 1,
                 },
                 "ref": {"log_prob_micro_batch_size_per_gpu": 1},
             },
@@ -99,5 +100,6 @@ class VerlConfigTests(unittest.TestCase):
         self.assertIn("data.train_files=/job/data/train.parquet", command)
         self.assertIn("reward.custom_reward_function.name=compute_score", command)
         self.assertIn("actor_rollout_ref.rollout.n=4", command)
+        self.assertIn("actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=1", command)
         self.assertIn("trainer.logger=[console,tensorboard]", command)
         self.assertIn("trainer.n_gpus_per_node=8", command)
