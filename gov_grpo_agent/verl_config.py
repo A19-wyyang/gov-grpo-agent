@@ -16,6 +16,7 @@ def build_verl_grpo_config(
     max_prompt_length=2048,
     max_response_length=512,
     total_epochs=1,
+    n_gpus_per_node=8,
 ):
     return {
         "algorithm": {
@@ -95,7 +96,7 @@ def build_verl_grpo_config(
             "save_freq": 10,
             "test_freq": 10,
             "nnodes": 1,
-            "n_gpus_per_node": 8,
+            "n_gpus_per_node": n_gpus_per_node,
         },
     }
 

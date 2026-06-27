@@ -17,6 +17,7 @@ class VerlConfigTests(unittest.TestCase):
                 val_files="artifacts/verl/train.parquet",
                 save_dir="artifacts/verl_grpo",
                 reward_path="gov_grpo_agent/verl_reward.py",
+                n_gpus_per_node=4,
             )
 
             text = config_path.read_text(encoding="utf-8")
@@ -41,6 +42,7 @@ class VerlConfigTests(unittest.TestCase):
             self.assertEqual(config["reward_model"]["model"]["path"], None)
             self.assertEqual(config["reward_model"]["rollout"]["name"], None)
             self.assertEqual(config["sandbox_fusion"], {"url": None, "max_concurrent": None})
+            self.assertEqual(config["trainer"]["n_gpus_per_node"], 4)
 
     def test_build_verl_grpo_command_uses_official_config_with_overrides(self):
         config = {

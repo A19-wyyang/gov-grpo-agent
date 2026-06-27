@@ -43,8 +43,14 @@ python -m gov_grpo_agent.train_grpo_verl \
   --work-dir artifacts/verl_grpo_qwen3_8b \
   --model-path Qwen/Qwen3-8B \
   --n-rollout 4 \
-  --total-epochs 1
+  --total-epochs 1 \
+  --gpus 4,5,6,7
 ```
+
+`--gpus` selects physical devices and automatically sets
+`trainer.n_gpus_per_node` to the number of selected GPUs. On the current
+mixed-memory server, GPUs 0-3 have 24 GB while GPUs 4-7 have 48 GB, so GRPO
+training should use `--gpus 4,5,6,7`.
 
 This writes:
 
