@@ -88,7 +88,7 @@ def build_verl_grpo_config(
         "trainer": {
             "project_name": project_name,
             "experiment_name": experiment_name,
-            "logger": ["console"],
+            "logger": ["console", "tensorboard"],
             "default_local_dir": save_dir,
             "total_epochs": total_epochs,
             "save_freq": 10,
@@ -124,17 +124,64 @@ def write_verl_grpo_config(
     return config
 
 
-def build_verl_grpo_command(config_path):
-    path = Path(config_path)
-    return [
+def build_verl_grpo_command(config):
+    override_paths = [
+        "algorithm.adv_estimator",
+        "algorithm.kl_ctrl.kl_coef",
+        "reward.custom_reward_function.path",
+        "reward.custom_reward_function.name",
+        "data.train_files",
+        "data.val_files",
+        "data.max_prompt_length",
+        "data.max_response_length",
+        "data.train_batch_size",
+        "actor_rollout_ref.model.path",
+        "actor_rollout_ref.model.enable_gradient_checkpointing",
+        "actor_rollout_ref.actor.optim.lr",
+        "actor_rollout_ref.actor.ppo_mini_batch_size",
+        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu",
+        "actor_rollout_ref.actor.use_kl_loss",
+        "actor_rollout_ref.actor.kl_loss_coef",
+        "actor_rollout_ref.rollout.name",
+        "actor_rollout_ref.rollout.n",
+        "actor_rollout_ref.rollout.do_sample",
+        "actor_rollout_ref.rollout.temperature",
+        "actor_rollout_ref.rollout.top_p",
+        "actor_rollout_ref.rollout.gpu_memory_utilization",
+        "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu",
+        "trainer.project_name",
+        "trainer.experiment_name",
+        "trainer.logger",
+        "trainer.default_local_dir",
+        "trainer.total_epochs",
+        "trainer.save_freq",
+        "trainer.test_freq",
+        "trainer.nnodes",
+        "trainer.n_gpus_per_node",
+    ]
+    command = [
         "python3",
         "-m",
         "verl.trainer.main_ppo",
-        "--config-dir",
-        path.parent.resolve().as_posix(),
-        "--config-name",
-        path.stem,
     ]
+    for path in override_paths:
+        command.append(f"{path}={_format_hydra_value(_get_nested(config, path))}")
+    return command
+
+
+def _get_nested(config, path):
+    value = config
+    for key in path.split("."):
+        value = value[key]
+    return value
+
+
+def _format_hydra_value(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ",".join(str(item) for item in value) + "]"
+    return str(value)
 
 
 def _to_yaml(value, indent=0):

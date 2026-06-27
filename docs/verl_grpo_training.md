@@ -73,7 +73,12 @@ The generated verl config uses:
 - `algorithm.adv_estimator: grpo`
 - `actor_rollout_ref.rollout.n: 4`
 - `reward.custom_reward_function.path: gov_grpo_agent/verl_reward.py`
-- `trainer.logger: [console]`
+- `trainer.logger: [console, tensorboard]`
+
+The generated shell script loads verl's packaged `ppo_trainer` configuration and
+passes these values as Hydra overrides. The YAML under the job directory is a
+human-readable record of the selected overrides; it is not used as a replacement
+for verl's complete configuration schema.
 
 verl also supports changing the logger to W&B if the server can log in to Weights & Biases.
 

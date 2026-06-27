@@ -1,5 +1,6 @@
 import argparse
 import json
+import shlex
 from pathlib import Path
 
 from gov_grpo_agent.verl_config import build_verl_grpo_command, write_verl_grpo_config
@@ -29,7 +30,7 @@ def prepare_verl_training_job(
         output_path=train_parquet,
         report_path=data_report_path,
     )
-    write_verl_grpo_config(
+    config = write_verl_grpo_config(
         output_path=config_path,
         model_path=model_path,
         train_files=str(train_parquet.resolve()),
@@ -40,7 +41,7 @@ def prepare_verl_training_job(
         n_rollout=n_rollout,
         total_epochs=total_epochs,
     )
-    command = build_verl_grpo_command(config_path)
+    command = build_verl_grpo_command(config)
     _write_run_script(run_script, command)
     manifest = {
         "input_jsonl": str(input_jsonl),
@@ -64,7 +65,7 @@ def _write_run_script(path, command):
             "set -euo pipefail",
             "export NCCL_P2P_DISABLE=1",
             "export NCCL_IB_DISABLE=1",
-            " ".join(command),
+            shlex.join(command),
             "",
         ]
     )

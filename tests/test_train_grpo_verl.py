@@ -41,4 +41,6 @@ class TrainGrpoVerlTests(unittest.TestCase):
             self.assertTrue(Path(manifest["config"]).exists())
             self.assertTrue(Path(manifest["run_script"]).exists())
             self.assertIn("verl.trainer.main_ppo", " ".join(manifest["command"]))
+            self.assertNotIn("--config-dir", manifest["command"])
+            self.assertIn("algorithm.adv_estimator=grpo", manifest["command"])
             self.assertEqual(manifest["data_report"]["usable_groups"], 1)

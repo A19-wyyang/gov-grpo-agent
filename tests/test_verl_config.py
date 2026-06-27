@@ -42,10 +42,62 @@ class VerlConfigTests(unittest.TestCase):
             self.assertEqual(config["reward_model"]["rollout"]["name"], None)
             self.assertEqual(config["sandbox_fusion"], {"url": None, "max_concurrent": None})
 
-    def test_build_verl_grpo_command_points_to_main_ppo_and_config(self):
-        command = build_verl_grpo_command("configs/verl_grpo_qwen3_8b.yaml")
+    def test_build_verl_grpo_command_uses_official_config_with_overrides(self):
+        config = {
+            "algorithm": {"adv_estimator": "grpo", "kl_ctrl": {"kl_coef": 0.03}},
+            "reward": {
+                "custom_reward_function": {
+                    "path": "/repo/gov_grpo_agent/verl_reward.py",
+                    "name": "compute_score",
+                }
+            },
+            "data": {
+                "train_files": "/job/data/train.parquet",
+                "val_files": "/job/data/train.parquet",
+                "max_prompt_length": 2048,
+                "max_response_length": 512,
+                "train_batch_size": 64,
+            },
+            "actor_rollout_ref": {
+                "model": {"path": "Qwen/Qwen3-8B", "enable_gradient_checkpointing": True},
+                "actor": {
+                    "optim": {"lr": 1e-6},
+                    "ppo_mini_batch_size": 16,
+                    "ppo_micro_batch_size_per_gpu": 1,
+                    "use_kl_loss": True,
+                    "kl_loss_coef": 0.03,
+                },
+                "rollout": {
+                    "name": "vllm",
+                    "n": 4,
+                    "do_sample": True,
+                    "temperature": 1.0,
+                    "top_p": 0.9,
+                    "gpu_memory_utilization": 0.75,
+                },
+                "ref": {"log_prob_micro_batch_size_per_gpu": 1},
+            },
+            "trainer": {
+                "project_name": "gov-grpo-agent",
+                "experiment_name": "qwen3_8b_grpo",
+                "logger": ["console", "tensorboard"],
+                "default_local_dir": "/job/checkpoints",
+                "total_epochs": 1,
+                "save_freq": 10,
+                "test_freq": 10,
+                "nnodes": 1,
+                "n_gpus_per_node": 8,
+            },
+        }
+
+        command = build_verl_grpo_command(config)
 
         self.assertEqual(command[0:3], ["python3", "-m", "verl.trainer.main_ppo"])
-        self.assertIn("--config-dir", command)
-        self.assertTrue(command[command.index("--config-dir") + 1].endswith("configs"))
-        self.assertEqual(command[-2:], ["--config-name", "verl_grpo_qwen3_8b"])
+        self.assertNotIn("--config-dir", command)
+        self.assertNotIn("--config-name", command)
+        self.assertIn("algorithm.adv_estimator=grpo", command)
+        self.assertIn("data.train_files=/job/data/train.parquet", command)
+        self.assertIn("reward.custom_reward_function.name=compute_score", command)
+        self.assertIn("actor_rollout_ref.rollout.n=4", command)
+        self.assertIn("trainer.logger=[console,tensorboard]", command)
+        self.assertIn("trainer.n_gpus_per_node=8", command)
