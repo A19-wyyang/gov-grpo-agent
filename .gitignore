@@ -17,6 +17,9 @@ checkpoints/
 tmp/
 wandb/
 ray_results/
+tensorboard_log/
+qa_render/
+project_*.tgz
 *.pt
 *.pth
 *.ckpt
