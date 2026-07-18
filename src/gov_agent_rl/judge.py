@@ -85,6 +85,8 @@ def score_rubric_payload(payload: dict[str, Any]) -> float:
     for name, spec in RUBRIC.items():
         item = dimensions.get(name)
         raw_score = item.get("score") if isinstance(item, dict) else item
+        if raw_score is None or isinstance(raw_score, bool):
+            raise ValueError(f"rubric score missing or invalid: {name}={raw_score!r}")
         score = float(raw_score)
         if not 0.0 <= score <= 4.0:
             raise ValueError(f"rubric score out of range: {name}={score}")
@@ -124,7 +126,8 @@ def _rubric_prompt() -> str:
         '"actionability":{"score":0,"reason":"..."},'
         '"decision_alignment":{"score":0,"reason":"..."},'
         '"professionalism":{"score":0,"reason":"..."}},'
-        '"summary":"一句话总评"}。不要输出总分或 JSON 之外的内容。'
+        '"summary":"一句话总评"}。每个 score 必须是 0、1、2、3、4 之一，'
+        "不得为 null、空字符串或缺失。不要输出总分或 JSON 之外的内容。"
     )
 
 
@@ -203,15 +206,39 @@ def judge_expression_detailed(
                 in {"1", "true", "yes"}
             },
         }
-        try:
-            response = client.chat.completions.create(
-                **request,
-                response_format={"type": "json_object"},
-            )
-        except Exception:
-            response = client.chat.completions.create(**request)
-        payload = _extract_json(response.choices[0].message.content or "")
-        score = score_rubric_payload(payload)
+        schema_retries = max(0, int(os.getenv("GOV_JUDGE_SCHEMA_RETRIES", "2")))
+        payload: dict[str, Any] | None = None
+        score: float | None = None
+        validation_error: Exception | None = None
+        for attempt in range(schema_retries + 1):
+            if attempt:
+                request["messages"] = [
+                    *request["messages"],
+                    {
+                        "role": "user",
+                        "content": (
+                            "上一次输出未通过格式校验。请重新输出完整 JSON；五个维度的 "
+                            "score 都必须是 0-4 的整数且不能为 null。"
+                        ),
+                    },
+                ]
+            try:
+                response = client.chat.completions.create(
+                    **request,
+                    response_format={"type": "json_object"},
+                )
+            except Exception:
+                response = client.chat.completions.create(**request)
+            try:
+                payload = _extract_json(response.choices[0].message.content or "")
+                score = score_rubric_payload(payload)
+                break
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                validation_error = exc
+        if payload is None or score is None:
+            raise RuntimeError(
+                f"judge returned invalid rubric after {schema_retries + 1} attempts"
+            ) from validation_error
         payload["rubric_version"] = RUBRIC_VERSION
         payload["model"] = model
         payload["score"] = score

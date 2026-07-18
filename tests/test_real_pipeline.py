@@ -124,9 +124,11 @@ def test_verl_row_forwards_case_through_stateful_tool_contract():
     assert _find_case(create_kwargs)["case_id"] == case.case_id
 
 
-def test_verl_reward_exports_replayed_environment_metrics(monkeypatch):
+def test_verl_reward_exports_replayed_environment_metrics(tmp_path, monkeypatch):
     monkeypatch.delenv("GOV_JUDGE_API_KEY", raising=False)
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
+    monkeypatch.setenv("GOV_JUDGE_REQUIRED", "0")
+    monkeypatch.setenv("GOV_JUDGE_CACHE", str(tmp_path / "judge.sqlite3"))
     case = build_cases()[0]
     episode = GovernmentServiceEpisode(case)
     _complete_case(episode)
@@ -212,6 +214,56 @@ def test_qwen_judge_parses_and_caches_structured_result(tmp_path, monkeypatch):
     assert first is not None and first[0] == 0.9375
     assert second == first
     assert calls["count"] == 1
+
+
+def test_qwen_judge_retries_null_rubric_score(tmp_path, monkeypatch):
+    calls = {"count": 0}
+    names = (
+        "clarity",
+        "reason_completeness",
+        "actionability",
+        "decision_alignment",
+        "professionalism",
+    )
+    invalid = {
+        "dimensions": {
+            name: {"score": None if name == "actionability" else 3, "reason": "x"}
+            for name in names
+        }
+    }
+    valid = {
+        "dimensions": {
+            name: {"score": 3, "reason": "x"} for name in names
+        },
+        "summary": "ok",
+    }
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            calls["count"] += 1
+            payload = invalid if calls["count"] == 1 else valid
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=json.dumps(payload))
+                    )
+                ]
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    monkeypatch.setenv("GOV_JUDGE_API_KEY", "test-key")
+    result = judge_expression_detailed(
+        "申请办理事项",
+        "SUBMIT",
+        "材料核验完成，申请已提交。",
+        tmp_path / "judge.sqlite3",
+    )
+    assert result is not None and result[0] == 0.75
+    assert calls["count"] == 2
 
 
 def test_stateful_tool_reuses_episode_across_release_calls():

@@ -123,6 +123,21 @@ bash scripts/train_grpo_formal.sh
 
 正式 SFT adapter 从 `outputs/sft-qwen3-8b-formal/final_adapter` 加载。底层 `train_grpo.sh` 仍支持通过环境变量改为 8 rollouts 或更长训练，参见 `configs/experiment.env.example`。
 
+`8 case × 4 rollout` 的长训练及训练后图表导出：
+
+```bash
+CUDA_VISIBLE_DEVICES=1,2 \
+TRAIN_BATCH_SIZE=8 \
+PPO_MINI_BATCH_SIZE=8 \
+ROLLOUT_N=4 \
+TOTAL_TRAINING_STEPS=100 \
+EXPERIMENT_NAME=qwen3_8b_gov_agent_grpo_b8r4_qwenjudge_100step \
+bash scripts/run_grpo_with_plots.sh
+```
+
+训练结束后，`results/<experiment>/` 会保存 TensorBoard/rollout 指标 CSV，
+以及奖励与安全、优化过程、训练效率三组 PNG 曲线。
+
 ### 3. 测试集评估
 
 ```bash
