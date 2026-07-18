@@ -1,0 +1,34 @@
+tools:
+  - class_name: gov_agent_rl.verl_tool.GovernmentServiceTool
+    config:
+      max_steps: 8
+      type: native
+    tool_schema:
+      type: function
+      function:
+        name: government_service
+        description: 执行政务办理动作。必须先补齐信息并依次完成政策、资格、材料和风险核验。
+        parameters:
+          type: object
+          properties:
+            action:
+              type: string
+              enum:
+                - ASK_USER
+                - POLICY_SEARCH
+                - ELIGIBILITY_CHECK
+                - MATERIAL_CHECK
+                - RISK_CHECK
+                - SUBMIT
+                - REFUSE
+            slot:
+              type: string
+              description: ASK_USER 时需要追问的字段
+            query:
+              type: string
+              description: POLICY_SEARCH 时的查询词
+            message:
+              type: string
+              description: SUBMIT 或 REFUSE 时面向用户的最终说明
+          required:
+            - action

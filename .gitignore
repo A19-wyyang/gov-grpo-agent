@@ -4,6 +4,32 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
-artifacts/
+venv/
+env/
+build/
 dist/
 *.egg-info/
+
+# Model artifacts and runtime outputs
+outputs/
+runs/
+checkpoints/
+tmp/
+wandb/
+ray_results/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Local/private documents
+deliverables/
+*.docx
+*.pdf
+
+# Credentials and machine-local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key

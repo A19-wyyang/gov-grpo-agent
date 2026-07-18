@@ -1,0 +1,32 @@
+{
+  "case_id": "subsidy_ineligible_001",
+  "title": "灵活就业社保补贴资格不满足",
+  "visible": {
+    "user_request": "我想申请灵活就业社保补贴。",
+    "known_slots": {
+      "city": "杭州"
+    }
+  },
+  "hidden_truth": {
+    "employment_status": "flexible_worker",
+    "social_security_months": 4,
+    "materials": {
+      "id_card": true,
+      "employment_certificate": true
+    },
+    "risk_flags": []
+  },
+  "policy_rules": {
+    "required_slots": ["city", "employment_status", "social_security_months"],
+    "required_tools": ["POLICY_SEARCH", "ELIGIBILITY_CHECK", "MATERIAL_CHECK", "RISK_CHECK"],
+    "required_materials": ["id_card", "employment_certificate"],
+    "min_social_security_months": 12
+  },
+  "risk_rules": {
+    "risk_flags": ["duplicate_application", "abnormal_social_security_record"]
+  },
+  "expected_result": {
+    "final_action": "REFUSE",
+    "reason": "社保缴纳月数不足 12 个月"
+  }
+}

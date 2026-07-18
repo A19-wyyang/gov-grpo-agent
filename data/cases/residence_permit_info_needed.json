@@ -1,0 +1,32 @@
+{
+  "case_id": "residence_permit_001",
+  "title": "居住证签注办理",
+  "visible": {
+    "user_request": "我的居住证快到期了，想办理签注。",
+    "known_slots": {
+      "city": "杭州"
+    }
+  },
+  "hidden_truth": {
+    "residence_months": 8,
+    "has_stable_address": true,
+    "materials": {
+      "id_card": true,
+      "residence_permit": true,
+      "address_certificate": true
+    },
+    "risk_flags": []
+  },
+  "policy_rules": {
+    "required_slots": ["city", "residence_months", "has_stable_address"],
+    "required_tools": ["POLICY_SEARCH", "ELIGIBILITY_CHECK", "MATERIAL_CHECK", "RISK_CHECK"],
+    "required_materials": ["id_card", "residence_permit", "address_certificate"]
+  },
+  "risk_rules": {
+    "risk_flags": ["expired_too_long", "identity_mismatch"]
+  },
+  "expected_result": {
+    "final_action": "SUBMIT",
+    "reason": "签注信息核验通过且材料齐全"
+  }
+}

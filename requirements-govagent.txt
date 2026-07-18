@@ -1,0 +1,14 @@
+# Tested server stack for conda env ``govagent``.
+# Install torch/torchvision/torchaudio for the server CUDA runtime first.
+numpy==1.26.4
+transformers==4.56.1
+peft==0.19.1
+verl==0.8.0
+# Install torch/vision/audio 2.7.0+cu118 and the official +cu118 vLLM wheel.
+torch==2.7.0
+torchvision==0.22.0
+torchaudio==2.7.0
+vllm==0.9.1
+opentelemetry-exporter-prometheus==0.47b0
+pybind11
+pylatexenc

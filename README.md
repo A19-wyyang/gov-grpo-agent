@@ -1,254 +1,231 @@
-# 基于 GRPO 的政务办理 Agent MVP
+# Government-Service Agentic RL with veRL
 
-这是一个从零搭建的政务办理 Agent 训练闭环 MVP。当前版本不接真实政务接口，也不直接启动大模型训练；它先把数据契约、mock 政务环境、Agent Runtime、trajectory rollout、Verifier/Judge reward、GRPO 分组数据和评估指标跑通。
+面向政务办理流程的可复现 Agentic RL 项目。模型需要通过多轮工具调用完成信息追问、政策查询、资格核验、材料检查和风险检查，最后才能提交或拒绝。正式训练使用 Qwen3-8B、LoRA 和 veRL GRPO；rollout 数可配置，双 RTX 4090 实跑配置为每个 case 4 条。
 
-## 已实现内容
+> 当前仓库同时保留 CPU 策略模拟器和真实模型训练链路。`train-sim` 的结果不能当作大模型训练结果；简历与报告中的模型指标只能来自正式测试集实跑产物。
 
-- 5 个 MVP 政务事项：租房提取公积金、医保异地备案、失业保险申领、人才补贴申请、个体工商户注册。
-- 200 条 case 数据工厂，覆盖简单通过、信息缺失、资格不满足、材料缺失、复杂混合五类路径。
-- 结构化动作空间：`Ask_User`、`Policy_Search`、`Eligibility_Check`、`Material_Check`、`Risk_Check`、`Submit`、`Refuse`。
-- mock 工具环境：`Policy_Search`、`Eligibility_Check`、`Material_Check`。
-- Agent Runtime：状态推进、动作校验、工具调用、trajectory logger、`max_turns=8`。
-- SFT ChatML 样本生成：MVP 默认 2000 条。
-- Reward 系统：规则 Verifier、轻量 Judge、missing-tool penalty、premature-submit penalty。
-- GRPO 数据准备：按 case 分组，计算 reward mean/std 和组内相对 advantage。
-- 评估指标：Success@1、Required Tool Recall、Premature Submit Rate、Missing Tool Rate、Material Check Call Rate、Final Decision Accuracy、Invalid Action Rate。
+## 已实现
 
-## 快速运行
+- 12 个政务事项、1,200 个结构化 case，按事项隔离为 800/200/200。
+- 正常办理、信息缺失、资格不满足、材料缺失、风险和对抗指令六类场景。
+- `PolicyView` 数据隔离，模型无法访问 `hidden_truth` 或 `expected_result`。
+- 有状态多轮环境与统一 `government_service` 工具。
+- veRL `BaseTool` adapter，每条 rollout 使用独立 episode。
+- 硬事实、过程合规和表达质量分层奖励；错误提交和风险漏检硬门控。
+- Assistant-only QLoRA SFT、veRL FSDP2 LoRA GRPO、可配置多 rollout。
+- pass@1/pass@k、工具调用率、过早提交、风险提交和平均轮次评测。
+- rollout/validation 自动导出 case、场景、环境奖励和安全指标。
+- 14 个 CPU 测试，覆盖数据切分、泄漏、参考流程、状态保持和 Reward Hacking。
 
-```powershell
-python -m gov_grpo_agent.cli --output-dir artifacts/mvp --case-count 200 --rollout-group-size 4
+## 架构
+
+```text
+Official-guide catalog
+        │
+        ▼
+1,200 CaseSpec ──► matter-isolated train/val/test
+        │
+        ├──► assistant-only SFT reference trajectories
+        │
+        └──► veRL ToolAgentLoop
+                  │
+          Qwen3-8B × N rollouts
+                  │
+          GovernmentServiceTool
+                  │
+       Verifier + Process + API Judge
+                  │
+          group-relative advantage
+                  │
+             LoRA update
 ```
 
-输出文件：
-
-- `artifacts/mvp/cases.jsonl`
-- `artifacts/mvp/sft_samples.jsonl`
-- `artifacts/mvp/trajectories.jsonl`
-- `artifacts/mvp/reward_reports.jsonl`
-- `artifacts/mvp/grpo_groups.json`
-- `artifacts/mvp/metrics.json`
-- `artifacts/mvp/summary.json`
-
-## 测试
+## 本地验证
 
 ```powershell
-python -m unittest discover -s tests -v
+$env:PYTHONPATH = "src"
+python -m gov_agent_rl build-data --out data/processed --no-parquet
+python -m gov_agent_rl validate-data --data data/processed
+python -m pytest -q
+python -m gov_agent_rl demo
 ```
 
-当前测试覆盖数据分布、case schema、工具输出、Runtime 行为、reward penalty、GRPO advantage、SFT 样本和评估指标。
-
-## 打包上传服务器
-
-生成只包含源码、测试、文档和项目元数据的训练服务器上传包：
-
-```powershell
-python -m gov_grpo_agent.packaging --output dist/gov_grpo_agent_server_bundle.zip
-```
-
-压缩包会包含 `gov_grpo_agent/`、`tests/`、`docs/`、`README.md` 和 `pyproject.toml`，并排除 `.git/`、`artifacts/`、`__pycache__/`、`.venv/`、`dist/` 等本地产物。
-
-上传到服务器后，可在服务器上解压并运行：
+生成 Parquet 需要 `datasets` 和 `pyarrow`：
 
 ```bash
-python -m unittest discover -s tests -v
-python -m gov_grpo_agent.cli --output-dir artifacts/mvp --case-count 200 --rollout-group-size 4
+pip install -e ".[data,dev]"
+python -m gov_agent_rl build-data --out data/processed
 ```
 
-## 下一阶段接入点
+## 服务器训练
 
-- 将 `sft_samples.jsonl` 转为 LLaMA-Factory、TRL 或 Axolotl 所需格式。
-- 将 `grpo_groups.json` 接入 TRL GRPOTrainer、verl 或 OpenRLHF。
-- 用 vLLM/SGLang 替换 `RuleBasedPolicy`，批量采样真实模型 rollout。
-- 将 mock Policy DB 扩展为结构化政策库，后续再加入 BM25/BGE/FAISS 检索。
+目标目录：
 
-## Qwen3-8B SFT 起步命令
+```text
+/data/code_repos/ywy/Project
+```
 
-服务器建议先创建 Python 3.11 环境并安装训练依赖：
+目标环境：
 
 ```bash
-conda create -n govagent python=3.11 -y
 conda activate govagent
-
-pip install --upgrade pip
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install transformers datasets accelerate peft trl bitsandbytes sentencepiece protobuf einops
+export CUDA_VISIBLE_DEVICES=0,1
+cd /data/code_repos/ywy/Project
+pip install -e .
+python -m gov_agent_rl build-data --out data/processed
+python -m gov_agent_rl validate-data --data data/processed
 ```
 
-先生成 MVP SFT 数据：
+服务器已验证的训练栈为 Python 3.11、PyTorch 2.7.0+cu118、
+Transformers 4.56.1、PEFT 0.19.1、veRL 0.8.0 和 vLLM
+0.9.1+cu118。`requirements-govagent.txt` 固定 Python 包版本；PyTorch 和
+vLLM 必须安装与服务器 CUDA 11.8 匹配的官方 wheel，不能直接使用 PyPI
+默认的 CUDA 12 wheel。
+
+两个训练入口会先执行 `scripts/patch_verl_sdpa.py`。该脚本是幂等的，
+用于给这一组已固定版本补齐 SDPA 转发、FSDP meta-device LoRA 加载、
+PEFT 可选张量并行导入、vLLM API 兼容、状态化工具 request ID 以及
+colocate 模式显存回收。Qwen3-8B 已缓存的
+服务器默认使用离线模式；需要首次下载模型时可显式设置：
 
 ```bash
-python -m gov_grpo_agent.cli --output-dir artifacts/mvp --case-count 200 --rollout-group-size 4
+HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 bash scripts/train_sft.sh --smoke
 ```
 
-再用 Qwen3-8B 做第一轮 QLoRA SFT。你的服务器有 4 张 48GB 4090，建议先只使用 GPU 4-7：
+### 1. SFT warm-up
 
 ```bash
-CUDA_VISIBLE_DEVICES=4,5,6,7 python -m gov_grpo_agent.train_sft \
-  --model-name-or-path Qwen/Qwen3-8B \
-  --train-file artifacts/mvp/sft_samples.jsonl \
-  --output-dir artifacts/qwen3_8b_sft_lora \
-  --max-seq-length 2048 \
-  --per-device-train-batch-size 1 \
-  --gradient-accumulation-steps 16 \
-  --learning-rate 2e-4 \
-  --num-train-epochs 1 \
-  --lora-rank 16
+bash scripts/train_sft.sh
 ```
 
-如果你的环境能访问或已经下载了 `Qwen/Qwen3-8B-Instruct`，可把 `--model-name-or-path` 改成该模型 ID 或本地模型目录。第一轮目标是让模型学会合法 JSON 动作、工具调用顺序和追问逻辑，不追求最终效果最大化。
+训练只对 assistant 和 tool-call token 计算 loss。如果 Qwen chat template 不能返回 assistant mask，训练会直接失败，不会静默退化为全 token loss。
 
-训练后验证 LoRA adapter 是否能输出合法动作 JSON：
+快速冒烟：
 
 ```bash
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.infer_sft \
-  --model-name-or-path Qwen/Qwen3-8B \
-  --adapter-path artifacts/qwen3_8b_sft_lora \
-  --query "我想提取公积金交房租，应该怎么办？"
+bash scripts/train_sft.sh --smoke
 ```
 
-单条推理通过后，生成真实模型 rollout、reward、GRPO group 和指标：
+### 2. veRL GRPO
 
 ```bash
-NCCL_P2P_DISABLE=1 NCCL_IB_DISABLE=1 CUDA_VISIBLE_DEVICES=4 python -m gov_grpo_agent.model_rollout \
-  --model-name-or-path Qwen/Qwen3-8B \
-  --adapter-path artifacts/qwen3_8b_sft_lora \
-  --output-dir artifacts/model_rollout \
-  --case-count 200 \
-  --rollout-group-size 4 \
-  --max-turns 8 \
-  --do-sample \
-  --temperature 1.0 \
-  --top-p 0.9
+bash scripts/smoke_grpo.sh
+bash scripts/train_grpo_formal.sh
 ```
 
-输出文件包括：
+双 RTX 4090 实跑参数：
 
-- `artifacts/model_rollout/model_trajectories.jsonl`
-- `artifacts/model_rollout/model_reward_reports.jsonl`
-- `artifacts/model_rollout/model_grpo_groups.json`
-- `artifacts/model_rollout/model_metrics.json`
-- `artifacts/model_rollout/model_summary.json`
+- Base model：`Qwen/Qwen3-8B`
+- LoRA：rank 16，alpha 32，all-linear
+- Rollout：4 trajectories/case，10 个 GRPO steps
+- Actor：FSDP2，2×RTX 4090
+- Rollout engine：vLLM hybrid engine
+- GRPO：clip 0.2、KL 0.02、entropy 0.001
+- Horizon：最多 8 次工具动作
+- Qwen3 thinking：关闭，避免推理文本挤占工具调用 token
 
-`model_rollout` 会输出类似 `[rollout] 12/800 case=...` 的进度日志，并且每条 trajectory 完成后立即追加到 JSONL。可另开终端观察：
+正式 SFT adapter 从 `outputs/sft-qwen3-8b-formal/final_adapter` 加载。底层 `train_grpo.sh` 仍支持通过环境变量改为 8 rollouts 或更长训练，参见 `configs/experiment.env.example`。
+
+### 3. 测试集评估
 
 ```bash
-tail -f artifacts/model_rollout/model_trajectories.jsonl
+bash scripts/evaluate_grpo.sh
 ```
 
-也可以按 case 分片多卡并行。例如 8 张卡各跑 25 个 case：
+该命令从 `global_step_10` 恢复 GRPO checkpoint，在按事项隔离的 200 条
+test case 上生成轨迹，并写出：
+
+- `runs/qwen3_8b_gov_agent_grpo_test/validation/10.jsonl`
+- `runs/qwen3_8b_gov_agent_grpo_test/metrics.json`
+
+GitHub 仓库不提交 checkpoint 和完整运行目录；本次验收的聚合指标快照保存在
+`results/qwen3_8b_grpo_formal_test_metrics.json`。
+
+### 已验证实跑
+
+- SFT smoke：真实非零学习率更新通过。
+- GRPO smoke：1 step 完成，`actor/grad_norm=0.3301`、`actor/lr=5e-6`，4 条轨迹落盘。
+- 正式 SFT：50 steps，`train_loss=1.0398`，`eval_loss=0.4040`，adapter 已保存。
+- 正式 GRPO：10/10 steps 完成，共生成 160 条训练轨迹；末步
+  `actor/grad_norm=0.1357`、`actor/lr=5e-6`，checkpoint 已保存到
+  `checkpoints/gov_agent_rl/qwen3_8b_gov_agent_grpo_formal/global_step_10`。
+- 独立测试集：从上述 checkpoint 恢复，在 200 个未见事项 case 上各生成
+  1 条多轮轨迹，200/200 条均已落盘。
+
+本次单种子工程验收结果：
+
+| 指标 | 结果 |
+| --- | ---: |
+| pass@1 / 最终动作正确率 | 57.50% |
+| 环境重放平均奖励 | 0.306125 |
+| hard-gate 通过率 | 55.00% |
+| 必要工具调用率 | 53.75% |
+| 材料核验调用率 | 45.00% |
+| 风险核验调用率 | 45.00% |
+| 危险提交率 | 22.50% |
+| 提前提交率 | 0.00% |
+| 平均环境轮数 | 7.30 |
+
+场景级 pass@1 为：对抗 100%（20 条）、不符合资格 50%（40 条）、
+信息缺失 0%（40 条）、材料缺失 100%（30 条）、风险 100%（20 条）、
+成功办理 50%（50 条）。这暴露出当前模型对信息缺失追问以及部分事项的
+提交/拒绝决策仍有明显短板，不能把本次工程验收结果表述为生产可用。
+
+评测每个 case 只有 1 条 rollout，因此本次 `pass@k` 与 `pass@1` 相同，
+不把它冒充为 pass@8。完整原始轨迹和聚合指标分别保存在：
+
+- `runs/qwen3_8b_gov_agent_grpo_test/validation/10.jsonl`
+- `runs/qwen3_8b_gov_agent_grpo_test/metrics.json`
+
+## 奖励约束
+
+总奖励由硬事实 0.65、过程合规 0.25、表达质量 0.10 组成。
+
+硬事实包括：
+
+- 最终动作正确
+- 必要槽位完整
+- 已完成资格、材料和风险核验
+- 工具结果与最终动作一致
+
+错误提交、风险漏检或错误最终动作会触发 hard gate，总奖励上限为 0.2。API Judge 只评价清晰度、理由完整性和可执行性，不能推翻 Verifier。
+
+配置 OpenAI-compatible Judge：
 
 ```bash
-python -m gov_grpo_agent.parallel_rollout \
-  --gpus 0,1,2,3,4,5,6,7 \
-  --total-cases 200 \
-  --model-name-or-path Qwen/Qwen3-8B \
-  --adapter-path artifacts/qwen3_8b_sft_lora \
-  --output-root artifacts/parallel_model_rollout \
-  --rollout-group-size 4 \
-  --max-turns 8 \
-  --do-sample \
-  --temperature 1.0 \
-  --top-p 0.9
+export GOV_JUDGE_BASE_URL=...
+export GOV_JUDGE_API_KEY=...
+export GOV_JUDGE_MODEL=...
 ```
 
-先只打印将要启动的 worker 命令，不真正运行：
+未配置 API 时表达分记为缺失，系统不会伪造 Judge 分数。
 
-```bash
-python -m gov_grpo_agent.parallel_rollout \
-  --gpus 0,1,2,3,4,5,6,7 \
-  --total-cases 200 \
-  --dry-run
-```
+## 数据说明
 
-查看所有 worker 日志：
+`catalog.py` 中的公开来源是可追溯种子，不等于已经完成法律审核。正式对外发布指标前必须：
 
-```bash
-tail -f artifacts/parallel_model_rollout/gpu*/rollout.log
-```
+1. 重新抓取并归档办事指南正文；
+2. 更新来源内容哈希和版本日期；
+3. 人工核对资格、材料与风险规则；
+4. 删除真实身份证号、联系方式等敏感信息；
+5. 保证同事项及其派生变体不跨训练和测试集合。
 
-查看每个分片已完成的 trajectory 数：
+测试集按事项隔离，衡量未见事项的迁移能力，因此不能用测试事项生成训练变体。
 
-```bash
-watch -n 2 'for d in artifacts/parallel_model_rollout/gpu*; do echo -n "$d "; test -f "$d/model_trajectories.jsonl" && wc -l "$d/model_trajectories.jsonl" || echo 0; done'
-```
+## 结果纪律
 
-所有分片完成后，合并 8 个 worker 的结果：
+- 不在代码或 README 中预写“提升百分比”。
+- 正式实验至少运行 3 个随机种子并报告均值与标准差。
+- 必须同时报告 pass@1、pass@8、错误提交率、missing-tool 率和必要工具调用率。
+- 当前 10-step、单种子、每 case 1 rollout 的结果只用于工程链路验收，不满足上一条论文级统计要求。
+- 未达到预期也保留原始轨迹和消融结果。
+- CPU `train-sim`、SFT 和 GRPO 的结果分开标注。
 
-```bash
-python -m gov_grpo_agent.merge_rollout_shards \
-  --input-root artifacts/parallel_model_rollout \
-  --output-dir artifacts/model_rollout_merged
-```
+## 代码入口
 
-合并后查看全局指标：
-
-```bash
-cat artifacts/model_rollout_merged/model_summary.json
-cat artifacts/model_rollout_merged/model_metrics.json
-```
-
-准备框架无关的 GRPO 训练 JSONL 和质量报告：
-
-```bash
-python -m gov_grpo_agent.prepare_grpo \
-  --input artifacts/model_rollout_merged_v3/model_grpo_groups.json \
-  --output artifacts/grpo_train/qwen3_grpo_train.jsonl \
-  --report artifacts/grpo_train/qwen3_grpo_report.json
-```
-
-报告字段包括：
-
-- `groups`：case group 数量
-- `responses`：总 rollout 数量
-- `usable_groups`：reward 有方差、可提供组内相对优势信号的 group 数
-- `low_variance_groups`：组内 reward 全相同或近似相同的 group 数
-- `avg_reward`：平均 reward
-
-如果 `usable_groups = 0`，说明同一个 case 的多条 rollout 没有 reward 差异，GRPO 没有相对优势信号。优先提高采样多样性，例如使用 `--do-sample --temperature 1.0 --top-p 0.9` 重新生成 rollout；不要把低方差 group 强行当作有效 GRPO 数据。
-
-## verl GRPO 训练与可视化
-
-准备 sampled GRPO JSONL 后，生成 verl 训练 job：
-
-```bash
-python -m gov_grpo_agent.train_grpo_verl \
-  --input-jsonl artifacts/grpo_train/qwen3_grpo_train_sampled.jsonl \
-  --work-dir artifacts/verl_grpo_qwen3_8b \
-  --model-path Qwen/Qwen3-8B \
-  --n-rollout 4 \
-  --total-epochs 1 \
-  --gpus 4,5,6,7
-```
-
-`--gpus` limits the generated verl job to the selected physical GPUs and sets
-the worker count automatically. This is required on mixed-memory servers where
-only a subset of devices has enough memory for GRPO training.
-
-运行 verl：
-
-```bash
-bash artifacts/verl_grpo_qwen3_8b/run_verl_grpo.sh
-```
-
-生成本地 HTML/CSV 指标报告：
-
-```bash
-python -m gov_grpo_agent.metrics_report \
-  --metrics artifacts/model_rollout_sampled_merged/model_metrics.json artifacts/verl_grpo_qwen3_8b/data/data_report.json \
-  --grpo-report artifacts/grpo_train/qwen3_grpo_report_sampled.json \
-  --output-dir artifacts/reports/qwen3_grpo \
-  --title "Qwen3-8B GRPO Metrics"
-```
-
-导出 TensorBoard event：
-
-```bash
-python -m gov_grpo_agent.tensorboard_export \
-  --metrics artifacts/model_rollout_sampled_merged/model_metrics.json artifacts/verl_grpo_qwen3_8b/data/data_report.json \
-  --log-dir artifacts/tensorboard/qwen3_grpo
-
-tensorboard --logdir artifacts/tensorboard/qwen3_grpo --host 0.0.0.0 --port 6006
-```
-
-详细说明见 `docs/verl_grpo_training.md`。
+- `src/gov_agent_rl/schema.py`：严格 schema 与 PolicyView
+- `src/gov_agent_rl/agent_env.py`：状态机与动作执行
+- `src/gov_agent_rl/rewarding.py`：在线/离线统一奖励
+- `src/gov_agent_rl/verl_tool.py`：veRL stateful tool
+- `scripts/train_sft.py`：assistant-only QLoRA SFT
+- `scripts/train_grpo.sh`：veRL Agent GRPO

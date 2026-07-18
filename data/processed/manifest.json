@@ -1,0 +1,19 @@
+{
+  "seed": 42,
+  "total": 1200,
+  "splits": {
+    "train": 800,
+    "validation": 200,
+    "test": 200
+  },
+  "matter_count": 12,
+  "scenario_counts_per_matter": {
+    "success": 25,
+    "missing_information": 20,
+    "ineligible": 20,
+    "missing_material": 15,
+    "risk": 10,
+    "adversarial": 10
+  },
+  "source_policy": "Versioned public-service guide seed; review sources before formal claims."
+}

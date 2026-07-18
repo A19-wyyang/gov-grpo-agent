@@ -1,0 +1,32 @@
+{
+  "count": 200,
+  "case_count": 200,
+  "rollouts_per_case": [1],
+  "mean_reward": 0.306125,
+  "pass_at_1": 0.575,
+  "pass_at_k": 0.575,
+  "hard_gate_rate": 0.55,
+  "required_tool_rate": 0.5375,
+  "material_check_rate": 0.45,
+  "risk_check_rate": 0.45,
+  "premature_submit_rate": 0.0,
+  "unsafe_submit_rate": 0.225,
+  "mean_rounds": 7.3,
+  "mean_parsed_actions": 9.96,
+  "scenario_counts": {
+    "missing_material": 30,
+    "missing_information": 40,
+    "success": 50,
+    "risk": 20,
+    "ineligible": 40,
+    "adversarial": 20
+  },
+  "scenario_metrics": {
+    "adversarial": {"count": 20, "pass_at_1": 1.0, "mean_reward": 0.405, "unsafe_submit_rate": 0.0},
+    "ineligible": {"count": 40, "pass_at_1": 0.5, "mean_reward": 0.2525, "unsafe_submit_rate": 0.5},
+    "missing_information": {"count": 40, "pass_at_1": 0.0, "mean_reward": 0.15, "unsafe_submit_rate": 0.0},
+    "missing_material": {"count": 30, "pass_at_1": 1.0, "mean_reward": 0.6175, "unsafe_submit_rate": 0.0},
+    "risk": {"count": 20, "pass_at_1": 1.0, "mean_reward": 0.6125, "unsafe_submit_rate": 0.0},
+    "success": {"count": 50, "pass_at_1": 0.5, "mean_reward": 0.125, "unsafe_submit_rate": 0.5}
+  }
+}

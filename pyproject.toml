@@ -3,26 +3,34 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gov-grpo-agent"
-version = "0.1.0"
-description = "MVP framework for a GRPO-optimized government-service agent."
+name = "gov-agent-rl"
+version = "0.2.0"
+description = "Reproducible government-service Agentic RL project with SFT, veRL GRPO, stateful tools, verifier rewards and evaluation."
+readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "pydantic>=2.7,<3",
+    "PyYAML>=6",
+]
+
+[project.optional-dependencies]
+data = ["datasets>=2.19", "pyarrow>=15"]
+judge = ["openai>=1.30"]
+train = [
+    "accelerate>=1.0",
+    "datasets>=2.19",
+    "numpy<2",
+    "peft==0.19.1",
+    "transformers==4.56.1",
+]
+dev = ["pytest>=7", "ruff>=0.5"]
 
 [project.scripts]
-gov-grpo-mvp = "gov_grpo_agent.cli:main"
-gov-grpo-package = "gov_grpo_agent.packaging:main"
-gov-grpo-train-sft = "gov_grpo_agent.train_sft:main"
-gov-grpo-infer-sft = "gov_grpo_agent.infer_sft:main"
-gov-grpo-model-rollout = "gov_grpo_agent.model_rollout:main"
-gov-grpo-parallel-rollout = "gov_grpo_agent.parallel_rollout:main"
-gov-grpo-merge-rollout-shards = "gov_grpo_agent.merge_rollout_shards:main"
-gov-grpo-prepare = "gov_grpo_agent.prepare_grpo:main"
-gov-grpo-verl-data = "gov_grpo_agent.verl_data:main"
-gov-grpo-verl-config = "gov_grpo_agent.verl_config:main"
-gov-grpo-train-verl = "gov_grpo_agent.train_grpo_verl:main"
-gov-grpo-metrics-report = "gov_grpo_agent.metrics_report:main"
-gov-grpo-tensorboard-export = "gov_grpo_agent.tensorboard_export:main"
+gov-agent-rl = "gov_agent_rl.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["gov_grpo_agent*"]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
