@@ -2,8 +2,6 @@
 
 面向政务办理流程的可复现 Agentic RL 项目。模型需要通过多轮工具调用完成信息追问、政策查询、资格核验、材料检查和风险检查，最后才能提交或拒绝。正式训练使用 Qwen3-8B、LoRA 和 veRL GRPO；rollout 数可配置，双 RTX 4090 实跑配置为每个 case 4 条。
 
-> 当前仓库同时保留 CPU 策略模拟器和真实模型训练链路。`train-sim` 的结果不能当作大模型训练结果；简历与报告中的模型指标只能来自正式测试集实跑产物。
-
 ## 已实现
 
 - 12 个政务事项、1,200 个结构化 case，按事项隔离为 800/200/200。
@@ -15,7 +13,7 @@
 - Assistant-only QLoRA SFT、veRL FSDP2 LoRA GRPO、可配置多 rollout。
 - pass@1/pass@k、工具调用率、过早提交、风险提交和平均轮次评测。
 - rollout/validation 自动导出 case、场景、环境奖励和安全指标。
-- 14 个 CPU 测试，覆盖数据切分、泄漏、参考流程、状态保持和 Reward Hacking。
+- 9 个核心测试，覆盖数据切分、泄漏、参考流程、状态保持、环境奖励重放和安全硬门控。
 
 ## 架构
 
@@ -47,7 +45,6 @@ $env:PYTHONPATH = "src"
 python -m gov_agent_rl build-data --out data/processed --no-parquet
 python -m gov_agent_rl validate-data --data data/processed
 python -m pytest -q
-python -m gov_agent_rl demo
 ```
 
 生成 Parquet 需要 `datasets` 和 `pyarrow`：
@@ -219,7 +216,6 @@ export GOV_JUDGE_MODEL=...
 - 必须同时报告 pass@1、pass@8、错误提交率、missing-tool 率和必要工具调用率。
 - 当前 10-step、单种子、每 case 1 rollout 的结果只用于工程链路验收，不满足上一条论文级统计要求。
 - 未达到预期也保留原始轨迹和消融结果。
-- CPU `train-sim`、SFT 和 GRPO 的结果分开标注。
 
 ## 代码入口
 

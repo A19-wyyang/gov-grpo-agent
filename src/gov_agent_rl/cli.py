@@ -6,59 +6,14 @@ from pathlib import Path
 
 from .data_builder import write_dataset
 from .evaluation import evaluate_jsonl
-from .experiments import run_training_comparison
-from .grpo import export_grpo_file
-from .report import generate_report
-from .rollout import rollout_to_file
-from .scoring import score_file
-
-
-DEFAULT_CASES_DIR = Path("data/cases")
-DEFAULT_RUN_DIR = Path("runs/demo")
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="gov_agent_rl",
-        description="Local government-service Agentic RL data-flow demo.",
+        description="Government-service SFT, veRL GRPO data and evaluation tools.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    demo_parser = subparsers.add_parser("demo", help="Run the full local demo flow.")
-    demo_parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_DIR)
-    demo_parser.add_argument("--out", type=Path, default=DEFAULT_RUN_DIR)
-
-    rollout_parser = subparsers.add_parser("rollout", help="Generate trajectories.")
-    rollout_parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_DIR)
-    rollout_parser.add_argument("--out", type=Path, default=DEFAULT_RUN_DIR)
-
-    verify_parser = subparsers.add_parser("verify", help="Score trajectories.")
-    verify_parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_DIR)
-    verify_parser.add_argument("--trajectories", type=Path, required=True)
-    verify_parser.add_argument("--out", type=Path, required=True)
-    verify_parser.add_argument(
-        "--profile",
-        choices=["hardened", "collapse_prone"],
-        default="hardened",
-    )
-
-    grpo_parser = subparsers.add_parser("export-grpo", help="Export GRPO groups.")
-    grpo_parser.add_argument("--scores", type=Path, required=True)
-    grpo_parser.add_argument("--out", type=Path, required=True)
-
-    report_parser = subparsers.add_parser("report", help="Generate Markdown report.")
-    report_parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_DIR)
-    report_parser.add_argument("--trajectories", type=Path, required=True)
-    report_parser.add_argument("--scores", type=Path, required=True)
-    report_parser.add_argument("--groups", type=Path, required=True)
-    report_parser.add_argument("--out", type=Path, required=True)
-
-    train_parser = subparsers.add_parser(
-        "train-sim",
-        help="Run the policy-collapse and reward-hacking training simulation.",
-    )
-    train_parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_DIR)
-    train_parser.add_argument("--out", type=Path, default=DEFAULT_RUN_DIR)
 
     data_parser = subparsers.add_parser(
         "build-data", help="Build the versioned 1,200-case SFT/GRPO dataset."
@@ -81,30 +36,7 @@ def main(argv: list[str] | None = None) -> None:
     eval_parser.add_argument("--out", type=Path, required=True)
 
     args = parser.parse_args(argv)
-    if args.command == "demo":
-        run_demo(args.cases, args.out)
-    elif args.command == "rollout":
-        output = rollout_to_file(args.cases, args.out)
-        print(f"wrote {output}")
-    elif args.command == "verify":
-        output = score_file(args.cases, args.trajectories, args.out, args.profile)
-        print(f"wrote {output}")
-    elif args.command == "export-grpo":
-        output = export_grpo_file(args.scores, args.out)
-        print(f"wrote {output}")
-    elif args.command == "report":
-        output = generate_report(
-            args.cases,
-            args.trajectories,
-            args.scores,
-            args.groups,
-            args.out,
-        )
-        print(f"wrote {output}")
-    elif args.command == "train-sim":
-        output = run_training_comparison(args.cases, args.out)
-        print(f"wrote {output}")
-    elif args.command == "build-data":
+    if args.command == "build-data":
         counts = write_dataset(
             args.out, seed=args.seed, write_parquet=not args.no_parquet
         )
@@ -115,31 +47,6 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "evaluate":
         result = evaluate_jsonl(args.input, args.out)
         print(json.dumps(result, ensure_ascii=False))
-
-
-def run_demo(cases_dir: Path, out_dir: Path) -> None:
-    trajectories_path = rollout_to_file(cases_dir, out_dir)
-    scores_path = score_file(
-        cases_dir,
-        trajectories_path,
-        out_dir / "scored.jsonl",
-    )
-    groups_path = export_grpo_file(scores_path, out_dir / "grpo_groups.jsonl")
-    report_path = generate_report(
-        cases_dir,
-        trajectories_path,
-        scores_path,
-        groups_path,
-        out_dir / "report.md",
-    )
-    experiment_report_path = run_training_comparison(cases_dir, out_dir)
-    print(f"wrote {trajectories_path}")
-    print(f"wrote {scores_path}")
-    print(f"wrote {groups_path}")
-    print(f"wrote {report_path}")
-    print(f"wrote {experiment_report_path}")
-
-
 def validate_generated_data(data_dir: Path) -> dict[str, object]:
     from .schema import CaseSpec
 
