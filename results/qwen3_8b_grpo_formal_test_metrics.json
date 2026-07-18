@@ -1,4 +1,8 @@
 {
+  "historical_snapshot": true,
+  "reward_pipeline": "pre-qwen-rubric-v1",
+  "judge_model": null,
+  "note": "These metrics predate the Qwen rubric judge and full environment-reward primary score fix.",
   "count": 200,
   "case_count": 200,
   "rollouts_per_case": [1],

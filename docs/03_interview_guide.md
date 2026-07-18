@@ -6,7 +6,7 @@
 
 我先把政务事项结构化为 case schema，并定义 `ASK_USER`、`POLICY_SEARCH`、`ELIGIBILITY_CHECK`、`MATERIAL_CHECK`、`RISK_CHECK`、`SUBMIT`、`REFUSE` 动作空间。Agent 和环境交互后，每一步都会记录 `state/action/observation`，形成 trajectory。
 
-奖励侧使用 Verifier 和 Judge 两层信号：Verifier 检查硬事实和必要工具，Judge 只评价最终回复的清晰度和可执行性。训练时对同一 case 做多条 rollout，用组内相对 reward 计算 GRPO advantage。
+奖励侧使用 Verifier 和 Qwen Judge 两层信号：Verifier 检查硬事实和必要工具，百炼 `qwen3.7-max` 按清晰度、理由完整性、可执行性、决策一致性和专业性五维 rubric 评价最终回复。Judge 仅占总奖励 10%，不能推翻 hard gate。训练时对同一 case 做多条 rollout，用组内相对 reward 计算 GRPO advantage。
 
 工程链路已经使用 Qwen3-8B 完成 assistant-only QLoRA SFT、veRL GRPO 和 200 条独立测试集评测。奖励函数通过环境重放检查必要工具、最终动作和危险提交，表达 Judge 不能覆盖这些硬事实。
 

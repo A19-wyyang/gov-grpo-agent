@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any
 
+from gov_agent_rl.judge import judge_expression
 from gov_agent_rl.rewarding import score_trajectory_dict
 from gov_agent_rl.schema import ActionName
 
@@ -65,42 +68,53 @@ def compute_score(
     ground_truth: dict[str, Any],
     extra_info: dict[str, Any] | None = None,
 ) -> float | dict[str, Any]:
-    """Completion-only reward; factual trajectory reward is owned by the tool.
+    """Replay a rollout and return the verifier-owned environment reward.
 
-    This deliberately has a small range so fluent text cannot overwhelm the
-    stateful verifier. It checks format/action clarity only.
+    The optional Qwen Judge contributes only the expression component inside
+    ``score_trajectory_dict``; hard facts and hard gates remain deterministic.
     """
     if data_source != "gov_agent_rl":
         return 0.0
     text = solution_str.strip()
     if not text:
         return 0.0
-    score = 0.02
-    if len(text) >= 16:
-        score += 0.03
-    if any(word in text for word in ("提交", "暂不能", "补齐", "转人工")):
-        score += 0.03
-    expected = str(ground_truth.get("final_action", ""))
-    if expected and expected in text.upper():
-        score += 0.02
-    expression_score = min(0.10, score)
     case = _find_case(extra_info or {})
     if case is None:
-        return expression_score
+        return 0.0
 
     actions = _tool_actions(solution_str)
+    final_action = ""
+    final_message = ""
+    for action in reversed(actions):
+        if action.get("action") in {
+            ActionName.SUBMIT.value,
+            ActionName.REFUSE.value,
+        }:
+            final_action = str(action["action"])
+            final_message = str(action.get("message", ""))
+            break
+    judge_score = judge_expression(
+        user_request=str(case.get("user_request", "")),
+        final_action=final_action,
+        message=final_message,
+        cache_path=Path(
+            os.getenv("GOV_JUDGE_CACHE", "runs/judge/qwen_expression.sqlite3")
+        ),
+    )
     breakdown = score_trajectory_dict(
         case,
         {
             "steps": [{"action": action} for action in actions],
-            "expression_score": expression_score / 0.10,
+            "expression_score": judge_score,
         },
     )
     return {
-        "score": expression_score,
+        "score": breakdown.total,
         "case_id": case["case_id"],
         "scenario_type": case.get("scenario_type", "unknown"),
         "environment_reward": breakdown.total,
+        "judge_score": -1.0 if judge_score is None else judge_score,
+        "judge_used": float(judge_score is not None),
         "hard_gate": float(breakdown.hard_gate),
         "parsed_action_count": len(actions),
         **breakdown.metrics,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
+from types import SimpleNamespace
 
 from gov_agent_rl.agent_env import GovernmentServiceEpisode
 from gov_agent_rl.data_builder import (
@@ -10,6 +12,7 @@ from gov_agent_rl.data_builder import (
     build_sft_messages,
     to_verl_row,
 )
+from gov_agent_rl.judge import judge_expression_detailed, score_rubric_payload
 from gov_agent_rl.rewarding import score_episode
 from gov_agent_rl.schema import ActionName
 from gov_agent_rl.verl_reward import compute_score
@@ -121,7 +124,9 @@ def test_verl_row_forwards_case_through_stateful_tool_contract():
     assert _find_case(create_kwargs)["case_id"] == case.case_id
 
 
-def test_verl_reward_exports_replayed_environment_metrics():
+def test_verl_reward_exports_replayed_environment_metrics(monkeypatch):
+    monkeypatch.delenv("GOV_JUDGE_API_KEY", raising=False)
+    monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
     case = build_cases()[0]
     episode = GovernmentServiceEpisode(case)
     _complete_case(episode)
@@ -142,8 +147,71 @@ def test_verl_reward_exports_replayed_environment_metrics():
     assert isinstance(score, dict)
     assert score["case_id"] == case.case_id
     assert score["parsed_action_count"] == len(actions)
+    assert score["score"] == score["environment_reward"]
+    assert score["judge_used"] == 0.0
     assert score["required_tool_rate"] == 1.0
     assert score["final_action_correct"] == 1.0
+
+
+def test_qwen_judge_rubric_uses_server_side_weighting():
+    payload = {
+        "dimensions": {
+            "clarity": {"score": 4},
+            "reason_completeness": {"score": 3},
+            "actionability": {"score": 2},
+            "decision_alignment": {"score": 4},
+            "professionalism": {"score": 3},
+        }
+    }
+    assert score_rubric_payload(payload) == 0.7875
+
+
+def test_qwen_judge_parses_and_caches_structured_result(tmp_path, monkeypatch):
+    calls = {"count": 0}
+    content = json.dumps(
+        {
+            "dimensions": {
+                "clarity": {"score": 4, "reason": "清晰"},
+                "reason_completeness": {"score": 3, "reason": "理由较完整"},
+                "actionability": {"score": 4, "reason": "下一步明确"},
+                "decision_alignment": {"score": 4, "reason": "与提交一致"},
+                "professionalism": {"score": 4, "reason": "专业"},
+            },
+            "summary": "回复清晰且可执行",
+        },
+        ensure_ascii=False,
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            calls["count"] += 1
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    monkeypatch.setenv("GOV_JUDGE_API_KEY", "test-key")
+    monkeypatch.setenv("GOV_JUDGE_MODEL", "qwen3.7-max")
+    cache_path = tmp_path / "judge.sqlite3"
+    first = judge_expression_detailed(
+        "申请办理事项",
+        "SUBMIT",
+        "材料已经核验完成，现已提交，请留意后续通知。",
+        cache_path,
+    )
+    second = judge_expression_detailed(
+        "申请办理事项",
+        "SUBMIT",
+        "材料已经核验完成，现已提交，请留意后续通知。",
+        cache_path,
+    )
+    assert first is not None and first[0] == 0.9375
+    assert second == first
+    assert calls["count"] == 1
 
 
 def test_stateful_tool_reuses_episode_across_release_calls():

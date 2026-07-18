@@ -35,11 +35,20 @@ def evaluate_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     def row_mean(key: str) -> float:
         return round(mean(float(row.get(key, 0.0)) for row in rows), 6)
 
+    judged_scores = [
+        float(row["judge_score"])
+        for row in rows
+        if float(row.get("judge_used", 0.0)) > 0 and float(row.get("judge_score", -1.0)) >= 0
+    ]
     metrics = {
         "count": len(rows),
         "case_count": len(grouped),
         "rollouts_per_case": sorted({len(items) for items in grouped.values()}),
         "mean_reward": round(mean(rewards), 6),
+        "judge_coverage": row_mean("judge_used"),
+        "mean_judge_score": (
+            round(mean(judged_scores), 6) if judged_scores else None
+        ),
         "pass_at_1": round(mean(pass_flags), 6),
         "pass_at_k": round(mean(float(value) for value in case_pass.values()), 6),
         "hard_gate_rate": row_mean("hard_gate"),

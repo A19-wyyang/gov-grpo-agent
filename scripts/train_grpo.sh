@@ -2,6 +2,12 @@
 set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/data/code_repos/ywy/Project}"
+JUDGE_ENV_FILE="${GOV_JUDGE_ENV_FILE:-${PROJECT_DIR}/.env.judge}"
+if [[ -f "${JUDGE_ENV_FILE}" ]]; then
+  set -a
+  source "${JUDGE_ENV_FILE}"
+  set +a
+fi
 MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-8B}"
 SFT_ADAPTER="${SFT_ADAPTER:-${PROJECT_DIR}/outputs/sft-qwen3-8b/final_adapter}"
 TRAIN_FILE="${TRAIN_FILE:-${PROJECT_DIR}/data/processed/train.parquet}"

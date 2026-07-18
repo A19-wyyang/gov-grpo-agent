@@ -13,7 +13,7 @@
 - Assistant-only QLoRA SFT、veRL FSDP2 LoRA GRPO、可配置多 rollout。
 - pass@1/pass@k、工具调用率、过早提交、风险提交和平均轮次评测。
 - rollout/validation 自动导出 case、场景、环境奖励和安全指标。
-- 9 个核心测试，覆盖数据切分、泄漏、参考流程、状态保持、环境奖励重放和安全硬门控。
+- 11 个核心测试，覆盖数据切分、泄漏、参考流程、状态保持、环境奖励重放、Qwen Judge 和安全硬门控。
 
 ## 架构
 
@@ -151,6 +151,8 @@ GitHub 仓库不提交 checkpoint 和完整运行目录；本次验收的聚合�
 
 本次单种子工程验收结果：
 
+> 以下数值来自升级 Qwen rubric Judge 之前的历史 checkpoint 与测试轨迹，保留用于可追溯对照。Judge/主奖励修复后的模型需要重新训练和评测，不能直接沿用这些数值。
+
 | 指标 | 结果 |
 | --- | ---: |
 | pass@1 / 最终动作正确率 | 57.50% |
@@ -185,17 +187,28 @@ GitHub 仓库不提交 checkpoint 和完整运行目录；本次验收的聚合�
 - 已完成资格、材料和风险核验
 - 工具结果与最终动作一致
 
-错误提交、风险漏检或错误最终动作会触发 hard gate，总奖励上限为 0.2。API Judge 只评价清晰度、理由完整性和可执行性，不能推翻 Verifier。
+错误提交、风险漏检或错误最终动作会触发 hard gate，总奖励上限为 0.2。Qwen Judge 只评价表达质量，不能推翻 Verifier。veRL 的主 `score` 使用完整环境重放奖励，不再使用独立的启发式文本分。
 
-配置 OpenAI-compatible Judge：
+默认 Judge 使用阿里云百炼 `qwen3.7-max`，rubric 为：
+
+| 维度 | 权重 | 边界 |
+| --- | ---: | --- |
+| 清晰度 | 20% | 表述清楚、简洁、无歧义 |
+| 理由完整性 | 25% | 说明决定理由，不判断事实真伪 |
+| 可执行性 | 25% | 给出明确下一步 |
+| 决策一致性 | 20% | 文本与 `SUBMIT/REFUSE` 一致 |
+| 专业性 | 10% | 专业、尊重、不夸大承诺 |
+
+配置百炼 OpenAI-compatible Judge：
 
 ```bash
-export GOV_JUDGE_BASE_URL=...
-export GOV_JUDGE_API_KEY=...
-export GOV_JUDGE_MODEL=...
+export GOV_JUDGE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+export GOV_JUDGE_API_KEY=你的百炼密钥
+export GOV_JUDGE_MODEL=qwen3.7-max
+export GOV_JUDGE_REQUIRED=1
 ```
 
-未配置 API 时表达分记为缺失，系统不会伪造 Judge 分数。
+也可以将这些变量写入服务器私有的 `.env.judge`；`train_grpo.sh` 会自动加载，该文件受 `.gitignore` 保护。Judge 返回五个维度的 0-4 分，最终归一化到 0-1，并缓存到 SQLite。未配置 API 时表达分记为缺失；正式训练建议设置 `GOV_JUDGE_REQUIRED=1`，避免接口异常时静默降级。
 
 ## 数据说明
 
