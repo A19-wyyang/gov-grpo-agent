@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import random
+from collections import defaultdict
 from pathlib import Path
+from statistics import mean
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -35,6 +38,65 @@ def read_step(path: Path, step: int) -> dict[str, float]:
     return {key: float(value) for key, value in matches[-1].items() if value != ""}
 
 
+def read_case_metrics(path: Path) -> dict[str, dict[str, float]]:
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                record = json.loads(line)
+                grouped[str(record["case_id"])].append(record)
+
+    result: dict[str, dict[str, float]] = {}
+    raw_metrics = {
+        key for key, _, _ in METRICS
+        if key not in {"safe_success_at_k", "process_success_at_k", "missing_tool_final_rate"}
+    }
+    for case_id, records in grouped.items():
+        values: dict[str, float] = {}
+        for key in raw_metrics:
+            present = [float(record[key]) for record in records if key in record]
+            if present:
+                values[key] = mean(present)
+        values["safe_success_at_k"] = float(any(
+            float(record.get("final_action_correct", 0.0)) > 0
+            and float(record.get("hard_gate", 0.0)) == 0
+            for record in records
+        ))
+        values["process_success_at_k"] = float(any(
+            float(record.get("final_action_correct", 0.0)) > 0
+            and float(record.get("hard_gate", 0.0)) == 0
+            and float(record.get("required_tool_rate", 0.0)) >= 1.0
+            for record in records
+        ))
+        result[case_id] = values
+    return result
+
+
+def paired_bootstrap_ci(
+    baseline: dict[str, dict[str, float]],
+    candidate: dict[str, dict[str, float]],
+    metric: str,
+    samples: int = 5000,
+) -> tuple[float, float, int] | None:
+    case_ids = sorted(
+        case_id for case_id in baseline.keys() & candidate.keys()
+        if metric in baseline[case_id] and metric in candidate[case_id]
+    )
+    if len(case_ids) < 2:
+        return None
+    differences = [candidate[case_id][metric] - baseline[case_id][metric] for case_id in case_ids]
+    rng = random.Random(20260719)
+    bootstraps = sorted(
+        mean(rng.choice(differences) for _ in differences)
+        for _ in range(samples)
+    )
+    return (
+        bootstraps[int(samples * 0.025)],
+        bootstraps[min(samples - 1, int(samples * 0.975))],
+        len(case_ids),
+    )
+
+
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     names = (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -51,26 +113,28 @@ def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 def draw_report(rows: list[dict[str, object]], output: Path, baseline: str, candidate: str) -> None:
-    width, row_height = 1280, 62
+    width, row_height = 1500, 62
     height = 150 + row_height * len(rows)
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
     draw.text((42, 28), "GRPO validation A/B comparison", fill="#111827", font=_font(28, True))
     draw.text((42, 72), f"baseline: {baseline}    candidate: {candidate}", fill="#4B5563", font=_font(17))
-    headers = ((42, "Metric"), (420, "Baseline"), (610, "Candidate"), (800, "Delta"), (1010, "Verdict"))
+    headers = ((42, "Metric"), (370, "Baseline"), (540, "Candidate"), (710, "Delta"), (870, "95% paired CI"), (1190, "Verdict"))
     for x, label in headers:
         draw.text((x, 118), label, fill="#374151", font=_font(16, True))
     for index, row in enumerate(rows):
         y = 150 + index * row_height
         if index % 2 == 0:
             draw.rectangle((25, y, width - 25, y + row_height), fill="#F8FAFC")
-        improved = bool(row["improved"])
-        color = "#15803D" if improved else ("#B91C1C" if float(row["delta"]) != 0 else "#6B7280")
+        verdict = str(row["verdict"])
+        color = "#15803D" if verdict == "improved" else ("#B91C1C" if verdict == "regressed" else "#6B7280")
         draw.text((42, y + 18), str(row["label"]), fill="#111827", font=_font(16))
-        draw.text((420, y + 18), f"{float(row['baseline']):.4f}", fill="#111827", font=_font(16))
-        draw.text((610, y + 18), f"{float(row['candidate']):.4f}", fill="#111827", font=_font(16))
-        draw.text((800, y + 18), f"{float(row['delta']):+.4f}", fill=color, font=_font(16, True))
-        draw.text((1010, y + 18), "improved" if improved else "regressed / flat", fill=color, font=_font(16, True))
+        draw.text((370, y + 18), f"{float(row['baseline']):.4f}", fill="#111827", font=_font(16))
+        draw.text((540, y + 18), f"{float(row['candidate']):.4f}", fill="#111827", font=_font(16))
+        draw.text((710, y + 18), f"{float(row['delta']):+.4f}", fill=color, font=_font(16, True))
+        ci = "n/a" if row["ci_low"] is None else f"[{float(row['ci_low']):+.4f}, {float(row['ci_high']):+.4f}]"
+        draw.text((870, y + 18), ci, fill=color, font=_font(16))
+        draw.text((1190, y + 18), verdict, fill=color, font=_font(16, True))
     image.save(output)
 
 
@@ -78,6 +142,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
+    parser.add_argument("--baseline-jsonl", type=Path)
+    parser.add_argument("--candidate-jsonl", type=Path)
     parser.add_argument("--step", type=int, default=25)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--baseline-name", default="baseline")
@@ -86,11 +152,23 @@ def main() -> None:
 
     baseline = read_step(args.baseline, args.step)
     candidate = read_step(args.candidate, args.step)
+    paired_baseline = read_case_metrics(args.baseline_jsonl) if args.baseline_jsonl else {}
+    paired_candidate = read_case_metrics(args.candidate_jsonl) if args.candidate_jsonl else {}
     rows: list[dict[str, object]] = []
     for key, label, higher_is_better in METRICS:
         if key not in baseline or key not in candidate:
             continue
         delta = candidate[key] - baseline[key]
+        interval = paired_bootstrap_ci(paired_baseline, paired_candidate, key)
+        ci_low, ci_high, paired_cases = interval if interval else (None, None, 0)
+        if interval is None:
+            verdict = "unquantified"
+        elif (higher_is_better and ci_low > 0) or (not higher_is_better and ci_high < 0):
+            verdict = "improved"
+        elif (higher_is_better and ci_high < 0) or (not higher_is_better and ci_low > 0):
+            verdict = "regressed"
+        else:
+            verdict = "inconclusive"
         rows.append(
             {
                 "metric": key,
@@ -98,8 +176,11 @@ def main() -> None:
                 "baseline": baseline[key],
                 "candidate": candidate[key],
                 "delta": delta,
+                "ci_low": ci_low,
+                "ci_high": ci_high,
+                "paired_cases": paired_cases,
                 "higher_is_better": higher_is_better,
-                "improved": delta > 0 if higher_is_better else delta < 0,
+                "verdict": verdict,
             }
         )
 
