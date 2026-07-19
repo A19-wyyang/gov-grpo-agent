@@ -56,7 +56,16 @@ def score_episode(
         ),
         "premature_submit": 0.35 if penalty_counts["premature_submit"] else 0.0,
         "repeated_question": 0.08 if penalty_counts["repeated_question"] else 0.0,
-        "illegal_action": 0.15 if penalty_counts["illegal_action"] else 0.0,
+        "invalid_slot_question": (
+            _env_float("GOV_INVALID_SLOT_PENALTY", 0.08)
+            if penalty_counts["invalid_slot_question"]
+            else 0.0
+        ),
+        "illegal_action": (
+            _env_float("GOV_ILLEGAL_ACTION_PENALTY", 0.15)
+            if penalty_counts["illegal_action"]
+            else 0.0
+        ),
         "max_steps_exceeded": 0.20 if penalty_counts["max_steps_exceeded"] else 0.0,
         "wrong_final_action": 0.50 if final != expected else 0.0,
     }
@@ -104,6 +113,9 @@ def score_episode(
         "unsafe_submit": float(unsafe_submit),
         "missing_required_tool": float(bool(missing_tools)),
         "incomplete_final": float(incomplete_final),
+        "illegal_action": float(bool(penalty_counts["illegal_action"])),
+        "invalid_slot_question": float(bool(penalty_counts["invalid_slot_question"])),
+        "max_steps_exceeded": float(bool(penalty_counts["max_steps_exceeded"])),
         "final_action_correct": float(final == expected),
         "rounds": float(len(episode.steps)),
     }

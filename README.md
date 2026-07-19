@@ -149,11 +149,13 @@ bash scripts/train_grpo_optimized.sh
 ```
 
 该配置仍保持 `16 case × 4 rollout`，优先强化缺失必要工具时的 hard gate，
-将 Judge 表达权重从 10% 降到 5%，并把 entropy coefficient 从 0.001 小幅提高到
-0.002。它不会直接照搬更大的 group size；只有当 `group_reward_std` 和
+同时惩罚非法工具参数、错误工具名和对不存在 slot 的追问；将 Judge 表达权重从
+10% 降到 5%，并把 entropy coefficient 从 0.001 小幅提高到 0.002。它不会直接照搬更大的 group size；只有当 `group_reward_std` 和
 `success@k` 证明有效轨迹覆盖不足时，才进一步增加 rollout 数。新增的
 `exploration_coverage_metrics.png` 会记录 action 分布、success@k、安全/流程完整
-success@k、缺工具最终答复率和零方差 group 比例。
+success@k、缺工具最终答复率、错误工具名率和零方差 group 比例。对照实验使用相同
+case 的配对 bootstrap 95% 置信区间；区间未完全跨过零的变化标记为
+`inconclusive`，避免把采样噪声误报为提升。
 
 ### 3. 测试集评估
 

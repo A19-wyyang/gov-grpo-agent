@@ -15,7 +15,7 @@ from gov_agent_rl.data_builder import (
 from gov_agent_rl.judge import judge_expression_detailed, score_rubric_payload
 from gov_agent_rl.rewarding import score_episode
 from gov_agent_rl.schema import ActionName
-from gov_agent_rl.verl_reward import compute_score
+from gov_agent_rl.verl_reward import _tool_actions, compute_score
 from gov_agent_rl.verl_tool import GovernmentServiceTool, _find_case
 
 
@@ -33,6 +33,20 @@ def _complete_case(episode: GovernmentServiceEpisode) -> None:
             "message": episode.case.expected_result.reason,
         }
     )
+
+
+def test_invalid_slot_and_tool_name_are_visible_to_reward():
+    episode = GovernmentServiceEpisode(build_cases()[0])
+    episode.execute({"action": "ASK_USER", "slot": "invented_slot"})
+    score = score_episode(episode)
+    assert score.penalties["invalid_slot_question"] == 0.08
+    assert score.metrics["invalid_slot_question"] == 1.0
+
+    calls = _tool_actions(
+        '<tool_call>{"name":"governmentService","arguments":'
+        '{"action":"ELIGIBILITY_CHECK"}}</tool_call>'
+    )
+    assert calls == [{"action": "__INVALID_TOOL_NAME__"}]
 
 
 def test_builds_1200_cases_with_matter_isolated_splits():

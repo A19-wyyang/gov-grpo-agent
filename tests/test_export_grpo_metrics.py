@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import json
 
-from scripts.export_grpo_metrics import load_rollouts
+from scripts.export_grpo_metrics import load_rollouts, tool_name_stats
+
+
+def test_tool_name_stats_detects_noncanonical_calls():
+    text = """
+    <tool_call>{"name":"government_service","arguments":{"action":"RISK_CHECK"}}</tool_call>
+    <tool_call>{"name":"governmentService","arguments":{"action":"SUBMIT"}}</tool_call>
+    """
+    assert tool_name_stats(text) == (2, 1)
 
 
 def test_rollout_export_includes_group_and_scenario_metrics(tmp_path):

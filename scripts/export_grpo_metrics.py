@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+import re
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean, pstdev
@@ -69,6 +70,16 @@ def extract_tool_actions(text: str) -> list[str]:
     return actions
 
 
+def tool_name_stats(text: str) -> tuple[int, int]:
+    """Return tool-call count and calls that use a non-canonical name."""
+    names = re.findall(
+        r'<tool_call>\s*\{.*?"name"\s*:\s*"([^"]+)"',
+        text,
+        flags=re.DOTALL,
+    )
+    return len(names), sum(name != "government_service" for name in names)
+
+
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -123,6 +134,9 @@ def load_rollouts(
         "unsafe_submit",
         "missing_required_tool",
         "incomplete_final",
+        "illegal_action",
+        "invalid_slot_question",
+        "max_steps_exceeded",
         "judge_score",
         "judge_used",
         "judge_clarity",
@@ -183,8 +197,14 @@ def load_rollouts(
         action_counts = {name: 0 for name in ACTION_NAMES}
         missing_tool_finals = 0
         final_outputs = 0
+        parsed_tool_calls = 0
+        invalid_tool_calls = 0
         for record in records:
-            actions = extract_tool_actions(str(record.get("output", "")))
+            output = str(record.get("output", ""))
+            actions = extract_tool_actions(output)
+            call_count, invalid_count = tool_name_stats(output)
+            parsed_tool_calls += call_count
+            invalid_tool_calls += invalid_count
             for action in actions:
                 action_counts[action] += 1
             if any(action in {"SUBMIT", "REFUSE"} for action in actions):
@@ -198,6 +218,7 @@ def load_rollouts(
             action_counts["SUBMIT"] + action_counts["REFUSE"]
         ) / max(1, total_actions)
         summary["missing_tool_final_rate"] = missing_tool_finals / max(1, final_outputs)
+        summary["invalid_tool_name_rate"] = invalid_tool_calls / max(1, parsed_tool_calls)
         result[step] = summary
 
         by_scenario: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -483,6 +504,11 @@ def main() -> None:
                         "missing-tool final rate",
                         _rollout(rollouts, "missing_tool_final_rate"),
                         COLORS["red"],
+                    ),
+                    (
+                        "invalid tool-name rate",
+                        _rollout(rollouts, "invalid_tool_name_rate"),
+                        COLORS["cyan"],
                     ),
                     (
                         "final-action share",

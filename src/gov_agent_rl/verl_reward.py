@@ -43,9 +43,17 @@ def _tool_actions(text: str) -> list[dict[str, Any]]:
             continue
         if not isinstance(payload, dict):
             continue
-        if payload.get("name") == "government_service":
+        if "name" in payload and "arguments" in payload:
+            if payload.get("name") != "government_service":
+                # Preserve malformed/unknown calls so replay penalizes them
+                # instead of silently dropping them from the trajectory.
+                calls.append({"action": "__INVALID_TOOL_NAME__"})
+                continue
             action = payload.get("arguments")
-        elif payload.get("function", {}).get("name") == "government_service":
+        elif isinstance(payload.get("function"), dict):
+            if payload["function"].get("name") != "government_service":
+                calls.append({"action": "__INVALID_TOOL_NAME__"})
+                continue
             action = payload["function"].get("arguments")
         else:
             continue
@@ -54,10 +62,7 @@ def _tool_actions(text: str) -> list[dict[str, Any]]:
                 action = json.loads(action)
             except json.JSONDecodeError:
                 continue
-        if (
-            isinstance(action, dict)
-            and action.get("action") in {item.value for item in ActionName}
-        ):
+        if isinstance(action, dict) and "action" in action:
             calls.append(action)
     return calls
 
