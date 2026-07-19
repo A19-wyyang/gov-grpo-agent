@@ -22,17 +22,21 @@ source "${PROJECT_DIR}/scripts/reward_v2_env.sh"
   --input "runs/${BASELINE_EXPERIMENT}/validation/${TARGET_STEP}.jsonl" \
   --cases data/processed/validation.cases.jsonl \
   --output "${COMPARISON_DIR}/baseline_common_reward.jsonl"
-"${PYTHON}" scripts/rescore_rollouts.py \
-  --input "runs/${CANDIDATE_EXPERIMENT}/validation/${TARGET_STEP}.jsonl" \
+"${PYTHON}" scripts/select_best_grpo_checkpoint.py \
+  --validation-dir "runs/${CANDIDATE_EXPERIMENT}/validation" \
   --cases data/processed/validation.cases.jsonl \
-  --output "${COMPARISON_DIR}/candidate_common_reward.jsonl"
+  --checkpoint-root "checkpoints/gov_agent_rl/${CANDIDATE_EXPERIMENT}" \
+  --output-dir "${COMPARISON_DIR}"
+BEST_STEP=$("${PYTHON}" -c \
+  "import json; print(json.load(open('${COMPARISON_DIR}/best_checkpoint.json'))['best_step'])")
 
 "${PYTHON}" scripts/compare_grpo_experiments.py \
   --baseline "results/${BASELINE_EXPERIMENT}/validation_metrics.csv" \
   --candidate "results/${CANDIDATE_EXPERIMENT}/validation_metrics.csv" \
   --baseline-jsonl "${COMPARISON_DIR}/baseline_common_reward.jsonl" \
-  --candidate-jsonl "${COMPARISON_DIR}/candidate_common_reward.jsonl" \
-  --step "${TARGET_STEP}" \
+  --candidate-jsonl "${COMPARISON_DIR}/candidate_step_${BEST_STEP}_common_reward.jsonl" \
+  --baseline-step "${TARGET_STEP}" \
+  --candidate-step "${BEST_STEP}" \
   --baseline-name "${BASELINE_EXPERIMENT}" \
   --candidate-name "${CANDIDATE_EXPERIMENT}" \
   --output-dir "${COMPARISON_DIR}"

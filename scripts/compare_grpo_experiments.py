@@ -166,14 +166,18 @@ def main() -> None:
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--baseline-jsonl", type=Path)
     parser.add_argument("--candidate-jsonl", type=Path)
-    parser.add_argument("--step", type=int, default=25)
+    parser.add_argument("--step", type=int, default=25, help="Default step for both sides")
+    parser.add_argument("--baseline-step", type=int)
+    parser.add_argument("--candidate-step", type=int)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--baseline-name", default="baseline")
     parser.add_argument("--candidate-name", default="candidate")
     args = parser.parse_args()
 
-    baseline = read_step(args.baseline, args.step)
-    candidate = read_step(args.candidate, args.step)
+    baseline_step = args.step if args.baseline_step is None else args.baseline_step
+    candidate_step = args.step if args.candidate_step is None else args.candidate_step
+    baseline = read_step(args.baseline, baseline_step)
+    candidate = read_step(args.candidate, candidate_step)
     paired_baseline = read_case_metrics(args.baseline_jsonl) if args.baseline_jsonl else {}
     paired_candidate = read_case_metrics(args.candidate_jsonl) if args.candidate_jsonl else {}
     rows: list[dict[str, object]] = []
@@ -226,7 +230,15 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
     (args.output_dir / "comparison.json").write_text(
-        json.dumps({"step": args.step, "metrics": rows}, indent=2), encoding="utf-8"
+        json.dumps(
+            {
+                "baseline_step": baseline_step,
+                "candidate_step": candidate_step,
+                "metrics": rows,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
     )
     draw_report(
         rows,
@@ -234,7 +246,10 @@ def main() -> None:
         args.baseline_name,
         args.candidate_name,
     )
-    print(f"Compared {len(rows)} metrics at validation step {args.step}: {args.output_dir}")
+    print(
+        f"Compared {len(rows)} metrics at baseline step {baseline_step} "
+        f"vs candidate step {candidate_step}: {args.output_dir}"
+    )
 
 
 if __name__ == "__main__":

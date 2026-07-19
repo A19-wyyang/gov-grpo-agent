@@ -164,6 +164,9 @@ Judge API 或格式校验失败时不会再给予中性表达分，默认回退�
 由于 reward-v2 改变了奖励定义，A/B 报告不会直接比较两次训练各自保存的 reward。
 `rescore_rollouts.py` 会先在同一 reward-v2 Verifier 下离线重放两边轨迹，保留原始
 分数为 `source_environment_reward`，再计算配对差值与置信区间。
+候选实验每 5 步验证并保存一次；`select_best_grpo_checkpoint.py` 先最大化流程完整的
+安全成功率 Wilson 95% 下界，再依次考虑安全成功率、危险提交率、最终动作正确率和
+统一 reward，并生成 `checkpoint_selection.csv/json/png`。
 
 ### 3. 测试集评估
 
