@@ -142,6 +142,19 @@ bash scripts/run_grpo_with_plots.sh
 CSV，以及奖励安全、组内区分度、Judge Rubric、场景效果、优化稳定性和训练效率
 PNG 曲线。验证集在训练前及每 25 steps 运行一次。
 
+基于基线诊断进行单变量可归因优化时，可运行：
+
+```bash
+bash scripts/train_grpo_optimized.sh
+```
+
+该配置仍保持 `16 case × 4 rollout`，优先强化缺失必要工具时的 hard gate，
+将 Judge 表达权重从 10% 降到 5%，并把 entropy coefficient 从 0.001 小幅提高到
+0.002。它不会直接照搬更大的 group size；只有当 `group_reward_std` 和
+`success@k` 证明有效轨迹覆盖不足时，才进一步增加 rollout 数。新增的
+`exploration_coverage_metrics.png` 会记录 action 分布、success@k、安全/流程完整
+success@k、缺工具最终答复率和零方差 group 比例。
+
 ### 3. 测试集评估
 
 ```bash

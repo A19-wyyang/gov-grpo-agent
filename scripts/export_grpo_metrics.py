@@ -22,11 +22,51 @@ COLORS = {
     "red": "#DC2626",
     "purple": "#9333EA",
     "cyan": "#0891B2",
+    "yellow": "#CA8A04",
     "grid": "#D1D5DB",
     "text": "#111827",
     "muted": "#6B7280",
     "background": "#FFFFFF",
 }
+
+ACTION_NAMES = (
+    "ASK_USER",
+    "POLICY_SEARCH",
+    "ELIGIBILITY_CHECK",
+    "MATERIAL_CHECK",
+    "RISK_CHECK",
+    "SUBMIT",
+    "REFUSE",
+)
+
+
+def extract_tool_actions(text: str) -> list[str]:
+    decoder = json.JSONDecoder()
+    actions: list[str] = []
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("name") == "government_service":
+            arguments = payload.get("arguments")
+        elif payload.get("function", {}).get("name") == "government_service":
+            arguments = payload["function"].get("arguments")
+        else:
+            continue
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                continue
+        action = arguments.get("action") if isinstance(arguments, dict) else None
+        if action in ACTION_NAMES:
+            actions.append(str(action))
+    return actions
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
@@ -81,6 +121,8 @@ def load_rollouts(
         "risk_check_called",
         "premature_submit",
         "unsafe_submit",
+        "missing_required_tool",
+        "incomplete_final",
         "judge_score",
         "judge_used",
         "judge_clarity",
@@ -114,6 +156,48 @@ def load_rollouts(
         summary["zero_variance_group_rate"] = (
             mean(float(value <= 1e-12) for value in group_stds) if group_stds else 1.0
         )
+        group_records: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for record in records:
+            group_records[str(record.get("case_id", "unknown"))].append(record)
+        summary["success_at_k"] = mean(
+            any(float(item.get("final_action_correct", 0.0)) > 0 for item in items)
+            for items in group_records.values()
+        )
+        summary["safe_success_at_k"] = mean(
+            any(
+                float(item.get("final_action_correct", 0.0)) > 0
+                and float(item.get("hard_gate", 0.0)) == 0
+                for item in items
+            )
+            for items in group_records.values()
+        )
+        summary["process_success_at_k"] = mean(
+            any(
+                float(item.get("final_action_correct", 0.0)) > 0
+                and float(item.get("hard_gate", 0.0)) == 0
+                and float(item.get("required_tool_rate", 0.0)) >= 1.0
+                for item in items
+            )
+            for items in group_records.values()
+        )
+        action_counts = {name: 0 for name in ACTION_NAMES}
+        missing_tool_finals = 0
+        final_outputs = 0
+        for record in records:
+            actions = extract_tool_actions(str(record.get("output", "")))
+            for action in actions:
+                action_counts[action] += 1
+            if any(action in {"SUBMIT", "REFUSE"} for action in actions):
+                final_outputs += 1
+                if float(record.get("required_tool_rate", 0.0)) < 1.0:
+                    missing_tool_finals += 1
+        total_actions = sum(action_counts.values())
+        for name, count in action_counts.items():
+            summary[f"action_share_{name.lower()}"] = count / max(1, total_actions)
+        summary["final_action_share"] = (
+            action_counts["SUBMIT"] + action_counts["REFUSE"]
+        ) / max(1, total_actions)
+        summary["missing_tool_final_rate"] = missing_tool_finals / max(1, final_outputs)
         result[step] = summary
 
         by_scenario: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -354,6 +438,67 @@ def main() -> None:
         ],
     )
     save_dashboard(
+        out_dir / "exploration_coverage_metrics.png",
+        f"GRPO exploration and effective coverage - {args.experiment}",
+        [
+            (
+                "Group success coverage",
+                [
+                    ("success@k", _rollout(rollouts, "success_at_k"), COLORS["blue"]),
+                    (
+                        "safe success@k",
+                        _rollout(rollouts, "safe_success_at_k"),
+                        COLORS["green"],
+                    ),
+                    (
+                        "process success@k",
+                        _rollout(rollouts, "process_success_at_k"),
+                        COLORS["purple"],
+                    ),
+                ],
+            ),
+            (
+                "Action distribution",
+                [
+                    (
+                        name.lower().replace("_", " "),
+                        _rollout(rollouts, f"action_share_{name.lower()}"),
+                        [
+                            COLORS["blue"],
+                            COLORS["green"],
+                            COLORS["orange"],
+                            COLORS["red"],
+                            COLORS["purple"],
+                            COLORS["cyan"],
+                            COLORS["yellow"],
+                        ][index],
+                    )
+                    for index, name in enumerate(ACTION_NAMES)
+                ],
+            ),
+            (
+                "Premature final-answer diagnostics",
+                [
+                    (
+                        "missing-tool final rate",
+                        _rollout(rollouts, "missing_tool_final_rate"),
+                        COLORS["red"],
+                    ),
+                    (
+                        "final-action share",
+                        _rollout(rollouts, "final_action_share"),
+                        COLORS["orange"],
+                    ),
+                    (
+                        "zero-variance groups",
+                        _rollout(rollouts, "zero_variance_group_rate"),
+                        COLORS["purple"],
+                    ),
+                ],
+            ),
+        ],
+    )
+    save_dashboard(
         out_dir / "judge_rubric_metrics.png",
         f"Qwen Judge rubric - {args.experiment}",
         [
@@ -530,6 +675,7 @@ def main() -> None:
             "validation_scenario_metrics.csv",
             "reward_safety_metrics.png",
             "group_learning_metrics.png",
+            "exploration_coverage_metrics.png",
             "judge_rubric_metrics.png",
             "scenario_metrics.png",
             "validation_metrics.png",

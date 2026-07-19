@@ -93,6 +93,32 @@ def test_reward_hacking_and_unsafe_submit_are_hard_gated():
     assert score.metrics["unsafe_submit"] == 1.0
 
 
+def test_missing_tool_final_answer_can_be_strictly_hard_gated(monkeypatch):
+    case = next(
+        case
+        for case in build_cases()
+        if case.scenario_type == "ineligible"
+        and case.expected_result.final_action == ActionName.REFUSE
+    )
+    episode = GovernmentServiceEpisode(case)
+    episode.execute(
+        {
+            "action": "REFUSE",
+            "message": "当前不符合条件，暂不予办理。",
+        }
+    )
+    monkeypatch.setenv("GOV_MISSING_TOOL_HARD_GATE", "1")
+    monkeypatch.setenv("GOV_MISSING_TOOL_PENALTY", "0.45")
+    monkeypatch.setenv("GOV_HARD_FACT_WEIGHT", "0.70")
+    monkeypatch.setenv("GOV_PROCESS_WEIGHT", "0.25")
+    monkeypatch.setenv("GOV_EXPRESSION_WEIGHT", "0.05")
+    score = score_episode(episode, expression_score=1.0)
+    assert score.hard_gate
+    assert score.total <= 0.2
+    assert score.metrics["missing_required_tool"] == 1.0
+    assert score.metrics["incomplete_final"] == 1.0
+
+
 def test_sft_messages_have_tool_calls_and_reference_final_action():
     case = build_cases()[0]
     messages = build_sft_messages(case)

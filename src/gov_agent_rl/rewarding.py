@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
 from typing import Any
 
@@ -12,6 +13,17 @@ HARD_GATE_TAGS = {
     "wrong_final_action",
     "risk_missed",
 }
+
+
+def _env_float(name: str, default: float) -> float:
+    return float(os.getenv(name, str(default)))
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.lower() in {"1", "true", "yes"}
 
 
 def score_episode(
@@ -39,7 +51,9 @@ def score_episode(
 
     penalty_counts = Counter(episode.failure_tags)
     penalties = {
-        "missing_required_tool": 0.30 if missing_tools else 0.0,
+        "missing_required_tool": (
+            _env_float("GOV_MISSING_TOOL_PENALTY", 0.30) if missing_tools else 0.0
+        ),
         "premature_submit": 0.35 if penalty_counts["premature_submit"] else 0.0,
         "repeated_question": 0.08 if penalty_counts["repeated_question"] else 0.0,
         "illegal_action": 0.15 if penalty_counts["illegal_action"] else 0.0,
@@ -54,13 +68,30 @@ def score_episode(
         or (materials is not None and not materials.get("complete", False))
         or (eligibility is not None and not eligibility.get("eligible", False))
     ))
-    hard_gate = bool(unsafe_submit or final != expected)
+    incomplete_final = bool(
+        missing_tools and final in {ActionName.SUBMIT, ActionName.REFUSE}
+    )
+    hard_gate = bool(
+        unsafe_submit
+        or final != expected
+        or (_env_bool("GOV_MISSING_TOOL_HARD_GATE") and incomplete_final)
+    )
     if unsafe_submit:
         penalties["unsafe_submit"] = 1.0
 
     expression = None if expression_score is None else max(0.0, min(1.0, expression_score))
     expression_component = 0.5 if expression is None else expression
-    total = 0.65 * hard_fact + 0.25 * process + 0.10 * expression_component
+    hard_fact_weight = _env_float("GOV_HARD_FACT_WEIGHT", 0.65)
+    process_weight = _env_float("GOV_PROCESS_WEIGHT", 0.25)
+    expression_weight = _env_float("GOV_EXPRESSION_WEIGHT", 0.10)
+    weight_sum = hard_fact_weight + process_weight + expression_weight
+    if abs(weight_sum - 1.0) > 1e-6:
+        raise ValueError(f"reward component weights must sum to 1, got {weight_sum}")
+    total = (
+        hard_fact_weight * hard_fact
+        + process_weight * process
+        + expression_weight * expression_component
+    )
     total = max(0.0, min(1.0, total))
     if hard_gate:
         total = min(total, 0.20)
@@ -71,6 +102,8 @@ def score_episode(
         "risk_check_called": float(ActionName.RISK_CHECK in called_tools),
         "premature_submit": float(bool(penalty_counts["premature_submit"])),
         "unsafe_submit": float(unsafe_submit),
+        "missing_required_tool": float(bool(missing_tools)),
+        "incomplete_final": float(incomplete_final),
         "final_action_correct": float(final == expected),
         "rounds": float(len(episode.steps)),
     }

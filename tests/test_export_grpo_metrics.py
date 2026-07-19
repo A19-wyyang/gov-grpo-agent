@@ -39,6 +39,9 @@ def test_rollout_export_includes_group_and_scenario_metrics(tmp_path):
     assert metrics[1]["group_count"] == 2
     assert metrics[1]["group_reward_std"] == 0.25
     assert metrics[1]["zero_variance_group_rate"] == 0.5
+    assert metrics[1]["success_at_k"] == 1.0
+    assert metrics[1]["safe_success_at_k"] == 1.0
+    assert metrics[1]["process_success_at_k"] == 0.0
     assert metrics[1]["judge_clarity"] == 1.0
     assert scenarios["success"][1]["mean_reward"] == 0.5
     assert scenarios["risk"][1]["hard_gate_failure_rate"] == 0.5
