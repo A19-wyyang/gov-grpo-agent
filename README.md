@@ -170,7 +170,8 @@ Judge API 或格式校验失败时不会再给予中性表达分，默认回退�
 validation 仅用于选择 checkpoint；随后 baseline 与候选最佳 checkpoint 都会在按事项
 隔离的 test 集上运行。`decide_grpo_promotion.py` 只有在 test 上流程安全成功率或安全
 成功率显著改善，且 unsafe、hard gate、最终动作等指标无显著退化时才输出 `promote`；
-否则输出 `reject` 或 `needs_more_evidence`。
+否则输出 `reject` 或 `needs_more_evidence`。晋级门槛同时检查各场景的配对置信区间，
+并生成 `scenario_comparison.csv/png`，避免总体均值掩盖风险、缺材料或对抗场景退化。
 
 ### 3. 测试集评估
 

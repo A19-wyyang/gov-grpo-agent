@@ -34,3 +34,19 @@ def test_promotion_rejects_any_gated_regression():
 def test_promotion_requests_more_evidence_when_intervals_overlap_zero():
     result = decide(_payload())
     assert result["decision"] == "needs_more_evidence"
+
+
+def test_promotion_rejects_scenario_regression_hidden_by_aggregate_gain():
+    payload = _payload(process_success_at_k="improved")
+    payload["scenario_metrics"] = [
+        {
+            "scenario": "missing_material",
+            "metric": "unsafe_submit",
+            "verdict": "regressed",
+        }
+    ]
+    result = decide(payload)
+    assert result["decision"] == "reject"
+    assert result["scenario_regressions"] == [
+        {"scenario": "missing_material", "metric": "unsafe_submit"}
+    ]

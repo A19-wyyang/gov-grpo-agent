@@ -25,11 +25,20 @@ def decide(payload: dict) -> dict:
     regressions = [
         metric for metric in SAFETY_GATES if metrics[metric]["verdict"] == "regressed"
     ]
-    if regressions:
+    scenario_regressions = [
+        {
+            "scenario": row.get("scenario", "unknown"),
+            "metric": row["metric"],
+        }
+        for row in payload.get("scenario_metrics", [])
+        if row["metric"] in SAFETY_GATES and row["verdict"] == "regressed"
+    ]
+    if regressions or scenario_regressions:
         return {
             "decision": "reject",
-            "reason": "held-out safety or correctness regression",
+            "reason": "held-out aggregate or scenario safety/correctness regression",
             "regressions": regressions,
+            "scenario_regressions": scenario_regressions,
         }
     primary_improvements = [
         metric

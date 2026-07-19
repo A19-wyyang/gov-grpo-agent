@@ -30,6 +30,14 @@ METRICS = (
     ("judge_used", "Judge coverage", True),
 )
 
+SCENARIO_METRICS = (
+    ("process_success_at_k", "Process-safe success", True),
+    ("safe_success_at_k", "Safe success", True),
+    ("final_action_correct", "Final action", True),
+    ("hard_gate", "Hard-gate rate", False),
+    ("unsafe_submit", "Unsafe submit", False),
+)
+
 
 def read_step(path: Path, step: int) -> dict[str, float]:
     with path.open(encoding="utf-8", newline="") as handle:
@@ -94,6 +102,18 @@ def read_case_metrics(path: Path) -> dict[str, dict[str, float]]:
     return result
 
 
+def read_case_scenarios(path: Path) -> dict[str, str]:
+    scenarios: dict[str, str] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                record = json.loads(line)
+                scenarios[str(record["case_id"])] = str(
+                    record.get("scenario_type", "unknown")
+                )
+    return scenarios
+
+
 def paired_bootstrap_ci(
     baseline: dict[str, dict[str, float]],
     candidate: dict[str, dict[str, float]],
@@ -119,6 +139,44 @@ def paired_bootstrap_ci(
     )
 
 
+def build_metric_row(
+    key: str,
+    label: str,
+    higher_is_better: bool,
+    baseline: dict[str, dict[str, float]],
+    candidate: dict[str, dict[str, float]],
+) -> dict[str, object] | None:
+    case_ids = [
+        case_id for case_id in baseline.keys() & candidate.keys()
+        if key in baseline[case_id] and key in candidate[case_id]
+    ]
+    if not case_ids:
+        return None
+    baseline_value = mean(baseline[case_id][key] for case_id in case_ids)
+    candidate_value = mean(candidate[case_id][key] for case_id in case_ids)
+    delta = candidate_value - baseline_value
+    interval = paired_bootstrap_ci(baseline, candidate, key)
+    ci_low, ci_high, paired_cases = interval if interval else (None, None, 0)
+    if interval is None:
+        verdict = "unquantified"
+    elif (higher_is_better and ci_low > 0) or (not higher_is_better and ci_high < 0):
+        verdict = "improved"
+    elif (higher_is_better and ci_high < 0) or (not higher_is_better and ci_low > 0):
+        verdict = "regressed"
+    else:
+        verdict = "inconclusive"
+    return {
+        "metric": key,
+        "label": label,
+        "baseline": baseline_value,
+        "candidate": candidate_value,
+        "delta": delta,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "paired_cases": paired_cases,
+        "higher_is_better": higher_is_better,
+        "verdict": verdict,
+    }
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     names = (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -180,6 +238,8 @@ def main() -> None:
     candidate = read_step(args.candidate, candidate_step)
     paired_baseline = read_case_metrics(args.baseline_jsonl) if args.baseline_jsonl else {}
     paired_candidate = read_case_metrics(args.candidate_jsonl) if args.candidate_jsonl else {}
+    baseline_scenarios = read_case_scenarios(args.baseline_jsonl) if args.baseline_jsonl else {}
+    candidate_scenarios = read_case_scenarios(args.candidate_jsonl) if args.candidate_jsonl else {}
     rows: list[dict[str, object]] = []
     for key, label, higher_is_better in METRICS:
         if key not in baseline or key not in candidate:
@@ -224,17 +284,48 @@ def main() -> None:
             }
         )
 
+    scenario_rows: list[dict[str, object]] = []
+    scenario_names = sorted(set(baseline_scenarios.values()) & set(candidate_scenarios.values()))
+    for scenario in scenario_names:
+        scenario_baseline = {
+            case_id: metrics
+            for case_id, metrics in paired_baseline.items()
+            if baseline_scenarios.get(case_id) == scenario
+            and candidate_scenarios.get(case_id) == scenario
+        }
+        scenario_candidate = {
+            case_id: paired_candidate[case_id]
+            for case_id in scenario_baseline
+            if case_id in paired_candidate
+        }
+        for key, label, higher_is_better in SCENARIO_METRICS:
+            row = build_metric_row(
+                key, f"{scenario} / {label}", higher_is_better,
+                scenario_baseline, scenario_candidate,
+            )
+            if row is not None:
+                row["scenario"] = scenario
+                scenario_rows.append(row)
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
     with (args.output_dir / "comparison.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
+    if scenario_rows:
+        with (args.output_dir / "scenario_comparison.csv").open(
+            "w", encoding="utf-8", newline=""
+        ) as handle:
+            writer = csv.DictWriter(handle, fieldnames=scenario_rows[0].keys())
+            writer.writeheader()
+            writer.writerows(scenario_rows)
     (args.output_dir / "comparison.json").write_text(
         json.dumps(
             {
                 "baseline_step": baseline_step,
                 "candidate_step": candidate_step,
                 "metrics": rows,
+                "scenario_metrics": scenario_rows,
             },
             indent=2,
         ),
@@ -246,6 +337,13 @@ def main() -> None:
         args.baseline_name,
         args.candidate_name,
     )
+    if scenario_rows:
+        draw_report(
+            scenario_rows,
+            args.output_dir / "scenario_comparison.png",
+            args.baseline_name,
+            args.candidate_name,
+        )
     print(
         f"Compared {len(rows)} metrics at baseline step {baseline_step} "
         f"vs candidate step {candidate_step}: {args.output_dir}"
