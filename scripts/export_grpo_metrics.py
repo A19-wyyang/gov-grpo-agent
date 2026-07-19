@@ -134,6 +134,8 @@ def load_rollouts(
         "unsafe_submit",
         "missing_required_tool",
         "incomplete_final",
+        "decision_gate",
+        "process_gate",
         "illegal_action",
         "invalid_slot_question",
         "max_steps_exceeded",
