@@ -13,3 +13,5 @@ opentelemetry-exporter-prometheus==0.47b0
 pybind11
 pylatexenc
 openai>=1.30,<3
+Pillow>=10
+tensorboard>=2.14

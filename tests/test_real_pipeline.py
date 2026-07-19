@@ -151,6 +151,11 @@ def test_verl_reward_exports_replayed_environment_metrics(tmp_path, monkeypatch)
     assert score["parsed_action_count"] == len(actions)
     assert score["score"] == score["environment_reward"]
     assert score["judge_used"] == 0.0
+    assert score["judge_clarity"] == -1.0
+    assert score["judge_reason_completeness"] == -1.0
+    assert score["judge_actionability"] == -1.0
+    assert score["judge_decision_alignment"] == -1.0
+    assert score["judge_professionalism"] == -1.0
     assert score["required_tool_rate"] == 1.0
     assert score["final_action_correct"] == 1.0
 

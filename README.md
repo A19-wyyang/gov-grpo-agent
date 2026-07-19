@@ -123,20 +123,24 @@ bash scripts/train_grpo_formal.sh
 
 正式 SFT adapter 从 `outputs/sft-qwen3-8b-formal/final_adapter` 加载。底层 `train_grpo.sh` 仍支持通过环境变量改为 8 rollouts 或更长训练，参见 `configs/experiment.env.example`。
 
-`8 case × 4 rollout` 的长训练及训练后图表导出：
+`16 case × 4 rollout` 的长训练及训练后图表导出：
 
 ```bash
 CUDA_VISIBLE_DEVICES=1,2 \
-TRAIN_BATCH_SIZE=8 \
-PPO_MINI_BATCH_SIZE=8 \
+TRAIN_BATCH_SIZE=16 \
+PPO_MINI_BATCH_SIZE=16 \
 ROLLOUT_N=4 \
 TOTAL_TRAINING_STEPS=100 \
-EXPERIMENT_NAME=qwen3_8b_gov_agent_grpo_b8r4_qwenjudge_100step \
+SAVE_FREQ=25 \
+TEST_FREQ=25 \
+VAL_BEFORE_TRAIN=True \
+EXPERIMENT_NAME=qwen3_8b_gov_agent_grpo_b16r4_qwenjudge_100step \
 bash scripts/run_grpo_with_plots.sh
 ```
 
-训练结束后，`results/<experiment>/` 会保存 TensorBoard/rollout 指标 CSV，
-以及奖励与安全、优化过程、训练效率三组 PNG 曲线。
+训练结束后，`results/<experiment>/` 会保存 TensorBoard、rollout 和分场景指标
+CSV，以及奖励安全、组内区分度、Judge Rubric、场景效果、优化稳定性和训练效率
+PNG 曲线。验证集在训练前及每 25 steps 运行一次。
 
 ### 3. 测试集评估
 

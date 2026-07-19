@@ -9,7 +9,7 @@ import json
 import math
 from collections import defaultdict
 from pathlib import Path
-from typing import Iterable
+from statistics import mean, pstdev
 
 from PIL import Image, ImageDraw, ImageFont
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
@@ -60,7 +60,9 @@ def load_tensorboard(log_dir: Path) -> dict[str, list[tuple[int, float]]]:
     }
 
 
-def load_rollouts(rollout_dir: Path) -> dict[int, dict[str, float]]:
+def load_rollouts(
+    rollout_dir: Path,
+) -> tuple[dict[int, dict[str, float]], dict[str, dict[int, dict[str, float]]]]:
     rows: dict[int, list[dict[str, object]]] = defaultdict(list)
     for path in sorted(rollout_dir.glob("*.jsonl")):
         with path.open(encoding="utf-8") as handle:
@@ -81,19 +83,60 @@ def load_rollouts(rollout_dir: Path) -> dict[int, dict[str, float]]:
         "unsafe_submit",
         "judge_score",
         "judge_used",
+        "judge_clarity",
+        "judge_reason_completeness",
+        "judge_actionability",
+        "judge_decision_alignment",
+        "judge_professionalism",
         "rounds",
     )
     result: dict[int, dict[str, float]] = {}
+    scenarios: dict[str, dict[int, dict[str, float]]] = defaultdict(dict)
     for step, records in sorted(rows.items()):
         summary: dict[str, float] = {"rollout_count": float(len(records))}
         for metric in metrics:
             values = [float(r[metric]) for r in records if r.get(metric) is not None]
-            if metric == "judge_score":
+            if metric.startswith("judge_") and metric != "judge_used":
                 values = [value for value in values if value >= 0]
             if values:
                 summary[metric] = sum(values) / len(values)
+        rewards = [
+            float(record.get("environment_reward", record.get("score", 0.0)))
+            for record in records
+        ]
+        summary["reward_std"] = pstdev(rewards) if len(rewards) > 1 else 0.0
+        grouped: dict[str, list[float]] = defaultdict(list)
+        for record, reward in zip(records, rewards):
+            grouped[str(record.get("case_id", "unknown"))].append(reward)
+        group_stds = [pstdev(values) for values in grouped.values() if len(values) > 1]
+        summary["group_count"] = float(len(grouped))
+        summary["group_reward_std"] = mean(group_stds) if group_stds else 0.0
+        summary["zero_variance_group_rate"] = (
+            mean(float(value <= 1e-12) for value in group_stds) if group_stds else 1.0
+        )
         result[step] = summary
-    return result
+
+        by_scenario: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for record in records:
+            by_scenario[str(record.get("scenario_type", "unknown"))].append(record)
+        for scenario, items in by_scenario.items():
+            scenarios[scenario][step] = {
+                "count": float(len(items)),
+                "mean_reward": mean(
+                    float(item.get("environment_reward", item.get("score", 0.0)))
+                    for item in items
+                ),
+                "pass_at_1": mean(
+                    float(item.get("final_action_correct", 0.0)) for item in items
+                ),
+                "hard_gate_failure_rate": mean(
+                    float(item.get("hard_gate", 0.0)) for item in items
+                ),
+                "unsafe_submit_rate": mean(
+                    float(item.get("unsafe_submit", 0.0)) for item in items
+                ),
+            }
+    return result, dict(scenarios)
 
 
 def write_tensorboard_csv(path: Path, scalars: dict[str, list[tuple[int, float]]]) -> None:
@@ -112,6 +155,25 @@ def write_rollout_csv(path: Path, metrics: dict[int, dict[str, float]]) -> None:
         writer.writeheader()
         for step, values in sorted(metrics.items()):
             writer.writerow({"step": step, **values})
+
+
+def write_scenario_csv(
+    path: Path, metrics: dict[str, dict[int, dict[str, float]]]
+) -> None:
+    fields = sorted(
+        {
+            key
+            for steps in metrics.values()
+            for values in steps.values()
+            for key in values
+        }
+    )
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["step", "scenario", *fields])
+        writer.writeheader()
+        for scenario, steps in sorted(metrics.items()):
+            for step, values in sorted(steps.items()):
+                writer.writerow({"step": step, "scenario": scenario, **values})
 
 
 def _plot_panel(
@@ -198,6 +260,16 @@ def _rollout(metrics: dict[int, dict[str, float]], name: str) -> list[tuple[int,
     return [(step, values[name]) for step, values in sorted(metrics.items()) if name in values]
 
 
+def _scenario(
+    metrics: dict[str, dict[int, dict[str, float]]], scenario: str, name: str
+) -> list[tuple[int, float]]:
+    return [
+        (step, values[name])
+        for step, values in sorted(metrics.get(scenario, {}).items())
+        if name in values
+    ]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment", required=True)
@@ -208,13 +280,18 @@ def main() -> None:
     project_dir = args.project_dir.resolve()
     log_dir = project_dir / "tensorboard_log" / "gov_agent_rl" / args.experiment
     rollout_dir = project_dir / "runs" / args.experiment / "rollouts"
+    validation_dir = project_dir / "runs" / args.experiment / "validation"
     out_dir = args.out_dir or project_dir / "results" / args.experiment
     out_dir.mkdir(parents=True, exist_ok=True)
 
     scalars = load_tensorboard(log_dir)
-    rollouts = load_rollouts(rollout_dir)
+    rollouts, scenarios = load_rollouts(rollout_dir)
+    validations, validation_scenarios = load_rollouts(validation_dir)
     write_tensorboard_csv(out_dir / "tensorboard_scalars.csv", scalars)
     write_rollout_csv(out_dir / "rollout_metrics.csv", rollouts)
+    write_scenario_csv(out_dir / "scenario_metrics.csv", scenarios)
+    write_rollout_csv(out_dir / "validation_metrics.csv", validations)
+    write_scenario_csv(out_dir / "validation_scenario_metrics.csv", validation_scenarios)
 
     save_dashboard(
         out_dir / "reward_safety_metrics.png",
@@ -230,7 +307,7 @@ def main() -> None:
             (
                 "Verifier and tool compliance rates",
                 [
-                    ("hard gate", _rollout(rollouts, "hard_gate"), COLORS["green"]),
+                    ("hard-gate failure", _rollout(rollouts, "hard_gate"), COLORS["red"]),
                     ("final action", _rollout(rollouts, "final_action_correct"), COLORS["blue"]),
                     ("required tools", _rollout(rollouts, "required_tool_rate"), COLORS["cyan"]),
                     ("judge coverage", _rollout(rollouts, "judge_used"), COLORS["purple"]),
@@ -241,6 +318,147 @@ def main() -> None:
                 [
                     ("unsafe submit", _rollout(rollouts, "unsafe_submit"), COLORS["red"]),
                     ("premature submit", _rollout(rollouts, "premature_submit"), COLORS["orange"]),
+                ],
+            ),
+        ],
+    )
+    save_dashboard(
+        out_dir / "group_learning_metrics.png",
+        f"GRPO group learning signal - {args.experiment}",
+        [
+            (
+                "Reward dispersion",
+                [
+                    ("batch reward std", _rollout(rollouts, "reward_std"), COLORS["blue"]),
+                    ("mean group reward std", _rollout(rollouts, "group_reward_std"), COLORS["purple"]),
+                ],
+            ),
+            (
+                "Groups without a learning signal",
+                [
+                    (
+                        "zero-variance group rate",
+                        _rollout(rollouts, "zero_variance_group_rate"),
+                        COLORS["red"],
+                    )
+                ],
+            ),
+            (
+                "Normalized GRPO advantages",
+                [
+                    ("mean", _tb(scalars, "critic/advantages/mean"), COLORS["blue"]),
+                    ("max", _tb(scalars, "critic/advantages/max"), COLORS["green"]),
+                    ("min", _tb(scalars, "critic/advantages/min"), COLORS["orange"]),
+                ],
+            ),
+        ],
+    )
+    save_dashboard(
+        out_dir / "judge_rubric_metrics.png",
+        f"Qwen Judge rubric - {args.experiment}",
+        [
+            (
+                "Rubric scores (normalized to 0-1)",
+                [
+                    ("clarity", _rollout(rollouts, "judge_clarity"), COLORS["blue"]),
+                    (
+                        "reason completeness",
+                        _rollout(rollouts, "judge_reason_completeness"),
+                        COLORS["green"],
+                    ),
+                    ("actionability", _rollout(rollouts, "judge_actionability"), COLORS["orange"]),
+                    (
+                        "decision alignment",
+                        _rollout(rollouts, "judge_decision_alignment"),
+                        COLORS["purple"],
+                    ),
+                    (
+                        "professionalism",
+                        _rollout(rollouts, "judge_professionalism"),
+                        COLORS["cyan"],
+                    ),
+                ],
+            ),
+            (
+                "Overall score and coverage",
+                [
+                    ("overall score", _rollout(rollouts, "judge_score"), COLORS["purple"]),
+                    ("coverage", _rollout(rollouts, "judge_used"), COLORS["red"]),
+                ],
+            ),
+        ],
+    )
+
+    scenario_colors = [
+        COLORS["blue"],
+        COLORS["green"],
+        COLORS["orange"],
+        COLORS["red"],
+        COLORS["purple"],
+        COLORS["cyan"],
+    ]
+    scenario_names = sorted(scenarios)
+    save_dashboard(
+        out_dir / "scenario_metrics.png",
+        f"Scenario-level training metrics - {args.experiment}",
+        [
+            (
+                "Mean reward",
+                [
+                    (name, _scenario(scenarios, name, "mean_reward"), scenario_colors[i % 6])
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+            (
+                "Final-action pass@1",
+                [
+                    (name, _scenario(scenarios, name, "pass_at_1"), scenario_colors[i % 6])
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+            (
+                "Hard-gate failure rate",
+                [
+                    (
+                        name,
+                        _scenario(scenarios, name, "hard_gate_failure_rate"),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+        ],
+    )
+
+    validation_names = sorted(validation_scenarios)
+    save_dashboard(
+        out_dir / "validation_metrics.png",
+        f"Held-out validation metrics - {args.experiment}",
+        [
+            (
+                "Validation reward and pass@1",
+                [
+                    ("reward", _rollout(validations, "environment_reward"), COLORS["blue"]),
+                    ("pass@1", _rollout(validations, "final_action_correct"), COLORS["green"]),
+                    ("required tools", _rollout(validations, "required_tool_rate"), COLORS["cyan"]),
+                ],
+            ),
+            (
+                "Validation safety failures",
+                [
+                    ("hard-gate failure", _rollout(validations, "hard_gate"), COLORS["red"]),
+                    ("unsafe submit", _rollout(validations, "unsafe_submit"), COLORS["orange"]),
+                ],
+            ),
+            (
+                "Scenario validation pass@1",
+                [
+                    (
+                        name,
+                        _scenario(validation_scenarios, name, "pass_at_1"),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(validation_names)
                 ],
             ),
         ],
@@ -303,10 +521,18 @@ def main() -> None:
         "tensorboard_tags": len(scalars),
         "rollout_steps": len(rollouts),
         "last_step": max(rollouts, default=0),
+        "validation_steps": len(validations),
         "artifacts": [
             "tensorboard_scalars.csv",
             "rollout_metrics.csv",
+            "scenario_metrics.csv",
+            "validation_metrics.csv",
+            "validation_scenario_metrics.csv",
             "reward_safety_metrics.png",
+            "group_learning_metrics.png",
+            "judge_rubric_metrics.png",
+            "scenario_metrics.png",
+            "validation_metrics.png",
             "optimization_metrics.png",
             "efficiency_metrics.png",
         ],

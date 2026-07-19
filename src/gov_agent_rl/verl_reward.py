@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from gov_agent_rl.judge import judge_expression
+from gov_agent_rl.judge import RUBRIC, judge_expression_detailed
 from gov_agent_rl.rewarding import score_trajectory_dict
 from gov_agent_rl.schema import ActionName
 
@@ -93,7 +93,7 @@ def compute_score(
             final_action = str(action["action"])
             final_message = str(action.get("message", ""))
             break
-    judge_score = judge_expression(
+    judge_result = judge_expression_detailed(
         user_request=str(case.get("user_request", "")),
         final_action=final_action,
         message=final_message,
@@ -101,6 +101,17 @@ def compute_score(
             os.getenv("GOV_JUDGE_CACHE", "runs/judge/qwen_expression.sqlite3")
         ),
     )
+    judge_score = None if judge_result is None else judge_result[0]
+    judge_payload = {} if judge_result is None else judge_result[1]
+    judge_dimensions = judge_payload.get("dimensions", {})
+    judge_metrics: dict[str, float] = {}
+    for name in RUBRIC:
+        item = judge_dimensions.get(name)
+        raw_score = item.get("score") if isinstance(item, dict) else item
+        try:
+            judge_metrics[f"judge_{name}"] = float(raw_score) / 4.0
+        except (TypeError, ValueError):
+            judge_metrics[f"judge_{name}"] = -1.0
     breakdown = score_trajectory_dict(
         case,
         {
@@ -115,6 +126,7 @@ def compute_score(
         "environment_reward": breakdown.total,
         "judge_score": -1.0 if judge_score is None else judge_score,
         "judge_used": float(judge_score is not None),
+        **judge_metrics,
         "hard_gate": float(breakdown.hard_gate),
         "parsed_action_count": len(actions),
         **breakdown.metrics,

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/data/code_repos/ywy/Project}"
-EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_8b_gov_agent_grpo_b8r4_qwenjudge_100step}"
+EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_8b_gov_agent_grpo_b16r4_qwenjudge_100step}"
 RUN_DIR="${PROJECT_DIR}/runs/${EXPERIMENT_NAME}"
 
 mkdir -p "${RUN_DIR}"
