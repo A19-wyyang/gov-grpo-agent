@@ -174,6 +174,7 @@ def test_verl_reward_exports_replayed_environment_metrics(tmp_path, monkeypatch)
     monkeypatch.delenv("GOV_JUDGE_API_KEY", raising=False)
     monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
     monkeypatch.setenv("GOV_JUDGE_REQUIRED", "0")
+    monkeypatch.setenv("GOV_JUDGE_FAILURE_SCORE", "0.0")
     monkeypatch.setenv("GOV_JUDGE_CACHE", str(tmp_path / "judge.sqlite3"))
     case = build_cases()[0]
     episode = GovernmentServiceEpisode(case)
@@ -197,6 +198,8 @@ def test_verl_reward_exports_replayed_environment_metrics(tmp_path, monkeypatch)
     assert score["parsed_action_count"] == len(actions)
     assert score["score"] == score["environment_reward"]
     assert score["judge_used"] == 0.0
+    assert score["judge_fallback_used"] == 1.0
+    assert score["score"] == 0.9
     assert score["judge_clarity"] == -1.0
     assert score["judge_reason_completeness"] == -1.0
     assert score["judge_actionability"] == -1.0
@@ -315,6 +318,33 @@ def test_qwen_judge_retries_null_rubric_score(tmp_path, monkeypatch):
     )
     assert result is not None and result[0] == 0.75
     assert calls["count"] == 2
+
+
+def test_qwen_judge_logs_sanitized_failure_metadata(tmp_path, monkeypatch):
+    class FailingCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("temporary judge failure")
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=FailingCompletions())
+
+    error_log = tmp_path / "judge-errors.jsonl"
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+    monkeypatch.setenv("GOV_JUDGE_API_KEY", "test-secret-key")
+    monkeypatch.setenv("GOV_JUDGE_REQUIRED", "0")
+    monkeypatch.setenv("GOV_JUDGE_ERROR_LOG", str(error_log))
+    result = judge_expression_detailed(
+        "申请办理事项",
+        "SUBMIT",
+        "材料核验完成，请继续办理。",
+        tmp_path / "judge.sqlite3",
+    )
+    assert result is None
+    record = json.loads(error_log.read_text(encoding="utf-8"))
+    assert record["error_type"] == "RuntimeError"
+    assert record["error"] == "temporary judge failure"
+    assert "test-secret-key" not in error_log.read_text(encoding="utf-8")
 
 
 def test_stateful_tool_reuses_episode_across_release_calls():

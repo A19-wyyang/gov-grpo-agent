@@ -141,6 +141,7 @@ def load_rollouts(
         "max_steps_exceeded",
         "judge_score",
         "judge_used",
+        "judge_fallback_used",
         "judge_clarity",
         "judge_reason_completeness",
         "judge_actionability",

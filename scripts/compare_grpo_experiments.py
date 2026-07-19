@@ -27,6 +27,7 @@ METRICS = (
     ("unsafe_submit", "Unsafe submit", False),
     ("missing_tool_final_rate", "Missing-tool final", False),
     ("invalid_tool_name_rate", "Invalid tool name", False),
+    ("judge_used", "Judge coverage", True),
 )
 
 

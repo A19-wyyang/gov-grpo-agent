@@ -107,6 +107,8 @@ def compute_score(
         ),
     )
     judge_score = None if judge_result is None else judge_result[0]
+    judge_fallback_score = float(os.getenv("GOV_JUDGE_FAILURE_SCORE", "0.0"))
+    expression_score = judge_score if judge_score is not None else judge_fallback_score
     judge_payload = {} if judge_result is None else judge_result[1]
     judge_dimensions = judge_payload.get("dimensions", {})
     judge_metrics: dict[str, float] = {}
@@ -121,7 +123,7 @@ def compute_score(
         case,
         {
             "steps": [{"action": action} for action in actions],
-            "expression_score": judge_score,
+            "expression_score": expression_score,
         },
     )
     return {
@@ -131,6 +133,7 @@ def compute_score(
         "environment_reward": breakdown.total,
         "judge_score": -1.0 if judge_score is None else judge_score,
         "judge_used": float(judge_score is not None),
+        "judge_fallback_used": float(judge_score is None),
         **judge_metrics,
         "hard_gate": float(breakdown.hard_gate),
         "parsed_action_count": len(actions),

@@ -157,6 +157,10 @@ success@k、缺工具最终答复率、错误工具名率和零方差 group 比�
 case 的配对 bootstrap 95% 置信区间；区间未完全跨过零的变化标记为
 `inconclusive`，避免把采样噪声误报为提升。
 
+Judge API 或格式校验失败时不会再给予中性表达分，默认回退为 0，并记录
+`judge_fallback_used`；可通过 `GOV_JUDGE_ERROR_LOG` 保存不含请求正文和密钥的
+异常类型，避免接口失败成为 reward shortcut。
+
 ### 3. 测试集评估
 
 ```bash

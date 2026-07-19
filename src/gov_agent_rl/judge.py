@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -244,7 +245,19 @@ def judge_expression_detailed(
         payload["score"] = score
         cache.put(key, score, payload)
         return score, payload
-    except Exception:
+    except Exception as exc:
+        error_log = os.getenv("GOV_JUDGE_ERROR_LOG")
+        if error_log:
+            path = Path(error_log)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            record = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "error_type": type(exc).__name__,
+                "error": str(exc)[:500],
+                "model": model,
+            }
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
         if required:
             raise
         return None
