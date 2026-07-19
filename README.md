@@ -167,6 +167,10 @@ Judge API 或格式校验失败时不会再给予中性表达分，默认回退�
 候选实验每 5 步验证并保存一次；`select_best_grpo_checkpoint.py` 先最大化流程完整的
 安全成功率 Wilson 95% 下界，再依次考虑安全成功率、危险提交率、最终动作正确率和
 统一 reward，并生成 `checkpoint_selection.csv/json/png`。
+validation 仅用于选择 checkpoint；随后 baseline 与候选最佳 checkpoint 都会在按事项
+隔离的 test 集上运行。`decide_grpo_promotion.py` 只有在 test 上流程安全成功率或安全
+成功率显著改善，且 unsafe、hard gate、最终动作等指标无显著退化时才输出 `promote`；
+否则输出 `reject` 或 `needs_more_evidence`。
 
 ### 3. 测试集评估
 

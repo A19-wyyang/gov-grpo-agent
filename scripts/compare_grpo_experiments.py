@@ -139,7 +139,7 @@ def draw_report(rows: list[dict[str, object]], output: Path, baseline: str, cand
     height = 150 + row_height * len(rows)
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
-    draw.text((42, 28), "GRPO validation A/B comparison", fill="#111827", font=_font(28, True))
+    draw.text((42, 28), "GRPO held-out A/B comparison", fill="#111827", font=_font(28, True))
     draw.text((42, 72), f"baseline: {baseline}    candidate: {candidate}", fill="#4B5563", font=_font(17))
     headers = ((42, "Metric"), (370, "Baseline"), (540, "Candidate"), (710, "Delta"), (870, "95% paired CI"), (1190, "Verdict"))
     for x, label in headers:

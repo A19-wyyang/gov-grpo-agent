@@ -40,3 +40,43 @@ BEST_STEP=$("${PYTHON}" -c \
   --baseline-name "${BASELINE_EXPERIMENT}" \
   --candidate-name "${CANDIDATE_EXPERIMENT}" \
   --output-dir "${COMPARISON_DIR}"
+
+# Validation selected the checkpoint. Promotion is decided only on the
+# matter-isolated test split to avoid checkpoint-selection bias.
+BASELINE_TEST_EXPERIMENT="${BASELINE_EXPERIMENT}_heldout_test"
+CANDIDATE_TEST_EXPERIMENT="${CANDIDATE_EXPERIMENT}_best${BEST_STEP}_heldout_test"
+CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-1,2}" \
+  CHECKPOINT_PATH="${PROJECT_DIR}/checkpoints/gov_agent_rl/${BASELINE_EXPERIMENT}/global_step_${TARGET_STEP}" \
+  EXPERIMENT_NAME="${BASELINE_TEST_EXPERIMENT}" \
+  bash scripts/evaluate_grpo.sh
+"${PYTHON}" scripts/export_grpo_metrics.py --experiment "${BASELINE_TEST_EXPERIMENT}"
+
+CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-1,2}" \
+  CHECKPOINT_PATH="${PROJECT_DIR}/checkpoints/gov_agent_rl/${CANDIDATE_EXPERIMENT}/global_step_${BEST_STEP}" \
+  EXPERIMENT_NAME="${CANDIDATE_TEST_EXPERIMENT}" \
+  bash scripts/evaluate_grpo.sh
+"${PYTHON}" scripts/export_grpo_metrics.py --experiment "${CANDIDATE_TEST_EXPERIMENT}"
+
+TEST_COMPARISON_DIR="${COMPARISON_DIR}/heldout_test"
+mkdir -p "${TEST_COMPARISON_DIR}"
+"${PYTHON}" scripts/rescore_rollouts.py \
+  --input "runs/${BASELINE_TEST_EXPERIMENT}/validation/${TARGET_STEP}.jsonl" \
+  --cases data/processed/test.cases.jsonl \
+  --output "${TEST_COMPARISON_DIR}/baseline_common_reward.jsonl"
+"${PYTHON}" scripts/rescore_rollouts.py \
+  --input "runs/${CANDIDATE_TEST_EXPERIMENT}/validation/${BEST_STEP}.jsonl" \
+  --cases data/processed/test.cases.jsonl \
+  --output "${TEST_COMPARISON_DIR}/candidate_common_reward.jsonl"
+"${PYTHON}" scripts/compare_grpo_experiments.py \
+  --baseline "results/${BASELINE_TEST_EXPERIMENT}/validation_metrics.csv" \
+  --candidate "results/${CANDIDATE_TEST_EXPERIMENT}/validation_metrics.csv" \
+  --baseline-jsonl "${TEST_COMPARISON_DIR}/baseline_common_reward.jsonl" \
+  --candidate-jsonl "${TEST_COMPARISON_DIR}/candidate_common_reward.jsonl" \
+  --baseline-step "${TARGET_STEP}" \
+  --candidate-step "${BEST_STEP}" \
+  --baseline-name "${BASELINE_TEST_EXPERIMENT}" \
+  --candidate-name "${CANDIDATE_TEST_EXPERIMENT}" \
+  --output-dir "${TEST_COMPARISON_DIR}"
+"${PYTHON}" scripts/decide_grpo_promotion.py \
+  --comparison "${TEST_COMPARISON_DIR}/comparison.json" \
+  --output "${TEST_COMPARISON_DIR}/promotion_decision.json"
