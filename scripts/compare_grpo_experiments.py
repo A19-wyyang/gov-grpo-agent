@@ -180,7 +180,21 @@ def main() -> None:
     for key, label, higher_is_better in METRICS:
         if key not in baseline or key not in candidate:
             continue
-        delta = candidate[key] - baseline[key]
+        paired_case_ids = [
+            case_id for case_id in paired_baseline.keys() & paired_candidate.keys()
+            if key in paired_baseline[case_id] and key in paired_candidate[case_id]
+        ]
+        baseline_value = (
+            mean(paired_baseline[case_id][key] for case_id in paired_case_ids)
+            if paired_case_ids
+            else baseline[key]
+        )
+        candidate_value = (
+            mean(paired_candidate[case_id][key] for case_id in paired_case_ids)
+            if paired_case_ids
+            else candidate[key]
+        )
+        delta = candidate_value - baseline_value
         interval = paired_bootstrap_ci(paired_baseline, paired_candidate, key)
         ci_low, ci_high, paired_cases = interval if interval else (None, None, 0)
         if interval is None:
@@ -195,8 +209,8 @@ def main() -> None:
             {
                 "metric": key,
                 "label": label,
-                "baseline": baseline[key],
-                "candidate": candidate[key],
+                "baseline": baseline_value,
+                "candidate": candidate_value,
                 "delta": delta,
                 "ci_low": ci_low,
                 "ci_high": ci_high,

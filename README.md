@@ -161,6 +161,10 @@ Judge API 或格式校验失败时不会再给予中性表达分，默认回退�
 `judge_fallback_used`；可通过 `GOV_JUDGE_ERROR_LOG` 保存不含请求正文和密钥的
 异常类型，避免接口失败成为 reward shortcut。
 
+由于 reward-v2 改变了奖励定义，A/B 报告不会直接比较两次训练各自保存的 reward。
+`rescore_rollouts.py` 会先在同一 reward-v2 Verifier 下离线重放两边轨迹，保留原始
+分数为 `source_environment_reward`，再计算配对差值与置信区间。
+
 ### 3. 测试集评估
 
 ```bash

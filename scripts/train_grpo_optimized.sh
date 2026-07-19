@@ -16,16 +16,7 @@ export EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_8b_gov_agent_grpo_b16r4_rewardv
 
 # Resume-inspired, but deliberately conservative: stronger verifier ownership,
 # lower expression weight, and a small entropy increase without changing group size.
-export GOV_MISSING_TOOL_PENALTY="${GOV_MISSING_TOOL_PENALTY:-0.45}"
-export GOV_MISSING_TOOL_HARD_GATE="${GOV_MISSING_TOOL_HARD_GATE:-1}"
-export GOV_DECISION_GATE_CEILING="${GOV_DECISION_GATE_CEILING:-0.0}"
-export GOV_PROCESS_GATE_CEILING="${GOV_PROCESS_GATE_CEILING:-0.10}"
-export GOV_INVALID_SLOT_PENALTY="${GOV_INVALID_SLOT_PENALTY:-0.15}"
-export GOV_ILLEGAL_ACTION_PENALTY="${GOV_ILLEGAL_ACTION_PENALTY:-0.25}"
-export GOV_HARD_FACT_WEIGHT="${GOV_HARD_FACT_WEIGHT:-0.70}"
-export GOV_PROCESS_WEIGHT="${GOV_PROCESS_WEIGHT:-0.25}"
-export GOV_EXPRESSION_WEIGHT="${GOV_EXPRESSION_WEIGHT:-0.05}"
-export GOV_JUDGE_FAILURE_SCORE="${GOV_JUDGE_FAILURE_SCORE:-0.0}"
+source "${PROJECT_DIR}/scripts/reward_v2_env.sh"
 export GOV_JUDGE_ERROR_LOG="${GOV_JUDGE_ERROR_LOG:-${PROJECT_DIR}/runs/${EXPERIMENT_NAME}/judge_errors.jsonl}"
 export ENTROPY_COEFF="${ENTROPY_COEFF:-0.002}"
 
