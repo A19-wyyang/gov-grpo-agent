@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -30,10 +31,46 @@ def _find_case(value: Any) -> dict[str, Any] | None:
     return None
 
 
+def _normalize_tool_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {"action": "__INVALID_TOOL_CALL__"}
+    if "name" in payload:
+        name = payload.get("name")
+        action = payload.get("arguments")
+    elif isinstance(payload.get("function"), dict):
+        name = payload["function"].get("name")
+        action = payload["function"].get("arguments")
+    else:
+        return {"action": "__INVALID_TOOL_CALL__"}
+    if name != "government_service":
+        return {"action": "__INVALID_TOOL_NAME__"}
+    if isinstance(action, str):
+        try:
+            action = json.loads(action)
+        except json.JSONDecodeError:
+            return {"action": "__INVALID_TOOL_CALL__"}
+    if not isinstance(action, dict) or "action" not in action:
+        return {"action": "__INVALID_TOOL_CALL__"}
+    return action
+
+
 def _tool_actions(text: str) -> list[dict[str, Any]]:
-    """Recover government-service calls from a decoded multi-turn response."""
+    """Recover calls and preserve malformed calls as penalized actions."""
+    blocks = re.findall(r"<tool_call>\s*(.*?)\s*</tool_call>", text, flags=re.DOTALL)
+    if blocks:
+        calls: list[dict[str, Any]] = []
+        for block in blocks:
+            try:
+                payload = json.loads(block)
+            except json.JSONDecodeError:
+                calls.append({"action": "__INVALID_TOOL_CALL__"})
+                continue
+            calls.append(_normalize_tool_payload(payload))
+        return calls
+
+    # Compatibility with stored/test trajectories containing bare JSON calls.
     decoder = json.JSONDecoder()
-    calls: list[dict[str, Any]] = []
+    calls = []
     for index, char in enumerate(text):
         if char != "{":
             continue
@@ -43,27 +80,8 @@ def _tool_actions(text: str) -> list[dict[str, Any]]:
             continue
         if not isinstance(payload, dict):
             continue
-        if "name" in payload and "arguments" in payload:
-            if payload.get("name") != "government_service":
-                # Preserve malformed/unknown calls so replay penalizes them
-                # instead of silently dropping them from the trajectory.
-                calls.append({"action": "__INVALID_TOOL_NAME__"})
-                continue
-            action = payload.get("arguments")
-        elif isinstance(payload.get("function"), dict):
-            if payload["function"].get("name") != "government_service":
-                calls.append({"action": "__INVALID_TOOL_NAME__"})
-                continue
-            action = payload["function"].get("arguments")
-        else:
-            continue
-        if isinstance(action, str):
-            try:
-                action = json.loads(action)
-            except json.JSONDecodeError:
-                continue
-        if isinstance(action, dict) and "action" in action:
-            calls.append(action)
+        if "name" in payload or isinstance(payload.get("function"), dict):
+            calls.append(_normalize_tool_payload(payload))
     return calls
 
 

@@ -47,6 +47,11 @@ def test_invalid_slot_and_tool_name_are_visible_to_reward():
         '{"action":"ELIGIBILITY_CHECK"}}</tool_call>'
     )
     assert calls == [{"action": "__INVALID_TOOL_NAME__"}]
+    malformed = _tool_actions(
+        '<tool_call>{"name":"government_service","arguments":'
+        '{"action":"RISK_CHECK"}</tool_call>'
+    )
+    assert malformed == [{"action": "__INVALID_TOOL_CALL__"}]
 
 
 def test_builds_1200_cases_with_matter_isolated_splits():

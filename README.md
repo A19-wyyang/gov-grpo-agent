@@ -153,8 +153,10 @@ bash scripts/train_grpo_optimized.sh
 10% 降到 5%，并把 entropy coefficient 从 0.001 小幅提高到 0.002。它不会直接照搬更大的 group size；只有当 `group_reward_std` 和
 `success@k` 证明有效轨迹覆盖不足时，才进一步增加 rollout 数。新增的
 `exploration_coverage_metrics.png` 会记录 action 分布、success@k、安全/流程完整
-success@k、缺工具最终答复率、错误工具名率和零方差 group 比例。对照实验使用相同
-case 的配对 bootstrap 95% 置信区间；区间未完全跨过零的变化标记为
+success@k、缺工具最终答复率、错误工具名率和零方差 group 比例。
+工具调用 JSON 截断、缺字段或参数无法解析时也会计入 `illegal_action`，并记录
+`tool_call_format_error_rate`，不会从 reward 轨迹中静默消失。
+对照实验使用相同 case 的配对 bootstrap 95% 置信区间；区间未完全跨过零的变化标记为
 `inconclusive`，避免把采样噪声误报为提升。
 
 Judge API 或格式校验失败时不会再给予中性表达分，默认回退为 0，并记录

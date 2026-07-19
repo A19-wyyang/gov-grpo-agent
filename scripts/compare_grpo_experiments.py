@@ -27,6 +27,7 @@ METRICS = (
     ("unsafe_submit", "Unsafe submit", False),
     ("missing_tool_final_rate", "Missing-tool final", False),
     ("invalid_tool_name_rate", "Invalid tool name", False),
+    ("tool_call_format_error_rate", "Malformed tool call", False),
     ("judge_used", "Judge coverage", True),
 )
 
@@ -65,6 +66,7 @@ def read_case_metrics(path: Path) -> dict[str, dict[str, float]]:
             "process_success_at_k",
             "missing_tool_final_rate",
             "invalid_tool_name_rate",
+            "tool_call_format_error_rate",
         }
     }
     for case_id, records in grouped.items():
@@ -84,19 +86,50 @@ def read_case_metrics(path: Path) -> dict[str, dict[str, float]]:
             and float(record.get("required_tool_rate", 0.0)) >= 1.0
             for record in records
         ))
-        tool_names = [
-            name
-            for record in records
-            for name in re.findall(
-                r'<tool_call>\s*\{.*?"name"\s*:\s*"([^"]+)"',
+        tool_names: list[str] = []
+        malformed_calls = 0
+        total_calls = 0
+        for record in records:
+            blocks = re.findall(
+                r"<tool_call>\s*(.*?)\s*</tool_call>",
                 str(record.get("output", "")),
                 flags=re.DOTALL,
             )
-        ]
+            total_calls += len(blocks)
+            for block in blocks:
+                try:
+                    payload = json.loads(block)
+                except json.JSONDecodeError:
+                    malformed_calls += 1
+                    continue
+                if not isinstance(payload, dict):
+                    malformed_calls += 1
+                    continue
+                if "name" in payload:
+                    name = payload.get("name")
+                    arguments = payload.get("arguments")
+                elif isinstance(payload.get("function"), dict):
+                    name = payload["function"].get("name")
+                    arguments = payload["function"].get("arguments")
+                else:
+                    malformed_calls += 1
+                    continue
+                tool_names.append(str(name))
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        malformed_calls += 1
+                        continue
+                if not isinstance(arguments, dict) or "action" not in arguments:
+                    malformed_calls += 1
         values["invalid_tool_name_rate"] = (
-            sum(name != "government_service" for name in tool_names) / len(tool_names)
-            if tool_names
+            sum(name != "government_service" for name in tool_names) / total_calls
+            if total_calls
             else 0.0
+        )
+        values["tool_call_format_error_rate"] = (
+            malformed_calls / total_calls if total_calls else 0.0
         )
         result[case_id] = values
     return result

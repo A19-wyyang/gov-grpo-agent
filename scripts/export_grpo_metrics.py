@@ -70,14 +70,45 @@ def extract_tool_actions(text: str) -> list[str]:
     return actions
 
 
+def tool_call_stats(text: str) -> tuple[int, int, int]:
+    """Return total calls, invalid-name calls, and malformed calls."""
+    blocks = re.findall(r"<tool_call>\s*(.*?)\s*</tool_call>", text, flags=re.DOTALL)
+    invalid_names = 0
+    invalid_format = 0
+    for block in blocks:
+        try:
+            payload = json.loads(block)
+        except json.JSONDecodeError:
+            invalid_format += 1
+            continue
+        if not isinstance(payload, dict):
+            invalid_format += 1
+            continue
+        if "name" in payload:
+            name = payload.get("name")
+            arguments = payload.get("arguments")
+        elif isinstance(payload.get("function"), dict):
+            name = payload["function"].get("name")
+            arguments = payload["function"].get("arguments")
+        else:
+            invalid_format += 1
+            continue
+        if name != "government_service":
+            invalid_names += 1
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+            except json.JSONDecodeError:
+                invalid_format += 1
+                continue
+        if not isinstance(arguments, dict) or "action" not in arguments:
+            invalid_format += 1
+    return len(blocks), invalid_names, invalid_format
+
+
 def tool_name_stats(text: str) -> tuple[int, int]:
-    """Return tool-call count and calls that use a non-canonical name."""
-    names = re.findall(
-        r'<tool_call>\s*\{.*?"name"\s*:\s*"([^"]+)"',
-        text,
-        flags=re.DOTALL,
-    )
-    return len(names), sum(name != "government_service" for name in names)
+    total, invalid_names, _ = tool_call_stats(text)
+    return total, invalid_names
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
@@ -202,12 +233,14 @@ def load_rollouts(
         final_outputs = 0
         parsed_tool_calls = 0
         invalid_tool_calls = 0
+        malformed_tool_calls = 0
         for record in records:
             output = str(record.get("output", ""))
             actions = extract_tool_actions(output)
-            call_count, invalid_count = tool_name_stats(output)
+            call_count, invalid_count, malformed_count = tool_call_stats(output)
             parsed_tool_calls += call_count
             invalid_tool_calls += invalid_count
+            malformed_tool_calls += malformed_count
             for action in actions:
                 action_counts[action] += 1
             if any(action in {"SUBMIT", "REFUSE"} for action in actions):
@@ -222,6 +255,7 @@ def load_rollouts(
         ) / max(1, total_actions)
         summary["missing_tool_final_rate"] = missing_tool_finals / max(1, final_outputs)
         summary["invalid_tool_name_rate"] = invalid_tool_calls / max(1, parsed_tool_calls)
+        summary["tool_call_format_error_rate"] = malformed_tool_calls / max(1, parsed_tool_calls)
         result[step] = summary
 
         by_scenario: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -512,6 +546,11 @@ def main() -> None:
                         "invalid tool-name rate",
                         _rollout(rollouts, "invalid_tool_name_rate"),
                         COLORS["cyan"],
+                    ),
+                    (
+                        "tool-call format error rate",
+                        _rollout(rollouts, "tool_call_format_error_rate"),
+                        COLORS["yellow"],
                     ),
                     (
                         "final-action share",
