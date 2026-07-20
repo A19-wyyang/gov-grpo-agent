@@ -1,0 +1,117 @@
+{
+  "count": 200,
+  "visible_unique": 128,
+  "full_unique": 200,
+  "minimum_group_visible_unique_rate": 1.0,
+  "minimum_group_full_unique_rate": 1.0,
+  "groups": [
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "company_change_registration",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "food_business_license",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    }
+  ]
+}

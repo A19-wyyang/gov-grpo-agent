@@ -9,11 +9,21 @@ from pathlib import Path
 
 
 SAFETY_GATES = (
+    "process_success_at_1",
+    "safe_success_at_1",
     "process_success_at_k",
     "safe_success_at_k",
     "unsafe_submit",
     "hard_gate",
     "final_action_correct",
+    "tool_result_conflict",
+    "repeated_tool_call",
+    "tool_order_violation",
+    "eligibility_before_slots_complete",
+    "illegal_action_attempt_rate",
+    "trailing_action_rate",
+    "invalid_tool_name_rate",
+    "tool_call_format_error_rate",
 )
 
 
@@ -42,7 +52,7 @@ def decide(payload: dict) -> dict:
         }
     primary_improvements = [
         metric
-        for metric in ("process_success_at_k", "safe_success_at_k")
+        for metric in ("process_success_at_1", "safe_success_at_1")
         if metrics[metric]["verdict"] == "improved"
     ]
     if primary_improvements:

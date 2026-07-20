@@ -13,7 +13,14 @@ checkpoint_dir="${PROJECT_DIR}/checkpoints/gov_agent_rl/${BASELINE_EXPERIMENT}/g
 comparison_dir="${PROJECT_DIR}/results/comparisons/${BASELINE_EXPERIMENT}_vs_${CANDIDATE_EXPERIMENT}"
 
 echo "Waiting for baseline validation and checkpoint at step ${TARGET_STEP}..."
-while [[ ! -s "${validation_file}" || ! -d "${checkpoint_dir}" ]]; do
+until "/data/anaconda3/envs/govagent/bin/python" \
+  "${PROJECT_DIR}/scripts/check_grpo_snapshot.py" \
+  --validation "${validation_file}" \
+  --checkpoint "${checkpoint_dir}" \
+  --step "${TARGET_STEP}" \
+  --expected-cases "${EXPECTED_VALIDATION_CASES:-200}" \
+  --world-size "${CHECKPOINT_WORLD_SIZE:-2}" \
+  --min-age-seconds "${SNAPSHOT_SETTLE_SECONDS:-30}" >/dev/null 2>&1; do
   if ! tmux has-session -t "${BASELINE_SESSION}" 2>/dev/null; then
     echo "Baseline session ended before step ${TARGET_STEP}." >&2
     exit 1
@@ -22,6 +29,14 @@ while [[ ! -s "${validation_file}" || ! -d "${checkpoint_dir}" ]]; do
 done
 
 echo "Baseline step ${TARGET_STEP} is durable; exporting its metrics."
+"/data/anaconda3/envs/govagent/bin/python" \
+  "${PROJECT_DIR}/scripts/check_grpo_snapshot.py" \
+  --validation "${validation_file}" \
+  --checkpoint "${checkpoint_dir}" \
+  --step "${TARGET_STEP}" \
+  --expected-cases "${EXPECTED_VALIDATION_CASES:-200}" \
+  --world-size "${CHECKPOINT_WORLD_SIZE:-2}" \
+  --min-age-seconds "${SNAPSHOT_SETTLE_SECONDS:-30}"
 "/data/anaconda3/envs/govagent/bin/python" \
   "${PROJECT_DIR}/scripts/export_grpo_metrics.py" \
   --experiment "${BASELINE_EXPERIMENT}"

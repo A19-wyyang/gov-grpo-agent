@@ -23,6 +23,11 @@ def main(argv: list[str] | None = None) -> None:
     data_parser.add_argument(
         "--no-parquet", action="store_true", help="Write JSONL only."
     )
+    data_parser.add_argument(
+        "--legacy-case-variants",
+        action="store_true",
+        help="Rebuild the exact low-diversity v1 cases used by historical runs.",
+    )
 
     validate_parser = subparsers.add_parser(
         "validate-data", help="Validate generated cases and split isolation."
@@ -38,7 +43,10 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.command == "build-data":
         counts = write_dataset(
-            args.out, seed=args.seed, write_parquet=not args.no_parquet
+            args.out,
+            seed=args.seed,
+            write_parquet=not args.no_parquet,
+            diverse=not args.legacy_case_variants,
         )
         print(json.dumps({"output": str(args.out), "splits": counts}, ensure_ascii=False))
     elif args.command == "validate-data":

@@ -1,4 +1,5 @@
 {
+  "dataset_variant": "legacy_v1",
   "seed": 42,
   "total": 1200,
   "splits": {
@@ -15,5 +16,6 @@
     "risk": 10,
     "adversarial": 10
   },
-  "source_policy": "Versioned public-service guide seed; review sources before formal claims."
+  "source_policy": "Versioned public-service guide seed; review sources before formal claims.",
+  "case_fingerprint_sha256": "73a8ef0dfbaafc00a4786766fc1875e3bd401b02828d44ea3485c057a5caf03f"
 }

@@ -6,7 +6,7 @@
 
 我先把政务事项结构化为 case schema，并定义 `ASK_USER`、`POLICY_SEARCH`、`ELIGIBILITY_CHECK`、`MATERIAL_CHECK`、`RISK_CHECK`、`SUBMIT`、`REFUSE` 动作空间。Agent 和环境交互后，每一步都会记录 `state/action/observation`，形成 trajectory。
 
-奖励侧使用 Verifier 和 Qwen Judge 两层信号：Verifier 检查硬事实和必要工具，百炼 `qwen3.7-max` 按清晰度、理由完整性、可执行性、决策一致性和专业性五维 rubric 评价最终回复。Judge 仅占总奖励 10%，不能推翻 hard gate。训练时对同一 case 做多条 rollout，用组内相对 reward 计算 GRPO advantage。
+奖励侧使用 Verifier 和 Qwen Judge 两层信号：Verifier 检查硬事实和必要工具，百炼 `qwen3.7-max` 按清晰度、理由完整性、可执行性、决策一致性和专业性五维 rubric 评价最终回复。历史基线中 Judge 占总奖励 10%；reward-v2 为降低表达分 shortcut 已降到 5%，且始终不能推翻 hard gate。训练时对同一 case 做多条 rollout，用组内相对 reward 计算 GRPO advantage。
 
 工程链路已经使用 Qwen3-8B 完成 assistant-only QLoRA SFT、veRL GRPO 和 200 条独立测试集评测。奖励函数通过环境重放检查必要工具、最终动作和危险提交，表达 Judge 不能覆盖这些硬事实。
 
@@ -34,7 +34,7 @@
 
 ### 当前实验有什么边界？
 
-当前已经完成真实 token rollout、clipped objective、KL 约束和双 RTX 4090 反向传播，但正式 GRPO 只有 10 steps，测试为单种子且每个 case 只有一条 rollout。因此它证明了完整工程链路可运行，不代表模型充分收敛，也不满足论文级多种子统计要求。
+历史工程验收已经完成真实 token rollout、clipped objective、KL 约束和双 RTX 4090 反向传播，但当时正式 GRPO 只有 10 steps，测试为单种子且每个 case 只有一条 rollout。因此历史结果只证明完整链路可运行。当前 reward-v2 流程将独立测试改为每 case 默认 4 条，并增加 case-level safe/process pass@k、配对置信区间和覆盖校验；在完成多种子训练前仍不能表述为论文级结论。
 
 ## 3. 不要说过头
 

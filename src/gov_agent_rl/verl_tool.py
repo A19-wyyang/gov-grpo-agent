@@ -93,8 +93,12 @@ class GovernmentServiceTool(BaseTool):
             }
         metrics = {
             "done": float(episode.done),
-            "rounds": float(len(episode.steps)),
+            "rounds": float(episode.action_attempts),
             "illegal_action": float("illegal_action" in episode.failure_tags),
+            "illegal_action_count": float(episode.failure_counts["illegal_action"]),
+            "trailing_action_count": float(
+                episode.failure_counts["action_after_done"]
+            ),
         }
         return (
             ToolResponse(text=json.dumps(observation, ensure_ascii=False)),

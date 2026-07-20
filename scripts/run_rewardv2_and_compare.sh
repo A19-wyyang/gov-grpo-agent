@@ -21,7 +21,8 @@ source "${PROJECT_DIR}/scripts/reward_v2_env.sh"
 "${PYTHON}" scripts/rescore_rollouts.py \
   --input "runs/${BASELINE_EXPERIMENT}/validation/${TARGET_STEP}.jsonl" \
   --cases data/processed/validation.cases.jsonl \
-  --output "${COMPARISON_DIR}/baseline_common_reward.jsonl"
+  --output "${COMPARISON_DIR}/baseline_common_reward.jsonl" \
+  --allow-missing-case-fingerprint
 "${PYTHON}" scripts/select_best_grpo_checkpoint.py \
   --validation-dir "runs/${CANDIDATE_EXPERIMENT}/validation" \
   --cases data/processed/validation.cases.jsonl \
@@ -62,11 +63,13 @@ mkdir -p "${TEST_COMPARISON_DIR}"
 "${PYTHON}" scripts/rescore_rollouts.py \
   --input "runs/${BASELINE_TEST_EXPERIMENT}/validation/${TARGET_STEP}.jsonl" \
   --cases data/processed/test.cases.jsonl \
-  --output "${TEST_COMPARISON_DIR}/baseline_common_reward.jsonl"
+  --output "${TEST_COMPARISON_DIR}/baseline_common_reward.jsonl" \
+  --allow-missing-case-fingerprint
 "${PYTHON}" scripts/rescore_rollouts.py \
   --input "runs/${CANDIDATE_TEST_EXPERIMENT}/validation/${BEST_STEP}.jsonl" \
   --cases data/processed/test.cases.jsonl \
-  --output "${TEST_COMPARISON_DIR}/candidate_common_reward.jsonl"
+  --output "${TEST_COMPARISON_DIR}/candidate_common_reward.jsonl" \
+  --allow-missing-case-fingerprint
 "${PYTHON}" scripts/compare_grpo_experiments.py \
   --baseline "results/${BASELINE_TEST_EXPERIMENT}/validation_metrics.csv" \
   --candidate "results/${CANDIDATE_TEST_EXPERIMENT}/validation_metrics.csv" \

@@ -40,6 +40,43 @@ ACTION_NAMES = (
     "REFUSE",
 )
 
+TB_TAG_ALIASES = {
+    "policy_loss": ("actor/pg_loss", "actor/loss"),
+    "reference_kl": ("actor/kl_loss",),
+    "policy_update_kl": ("actor/ppo_kl",),
+    "entropy": ("actor/entropy", "actor/entropy_loss"),
+    "grad_norm": ("actor/grad_norm",),
+    "clip_fraction": ("actor/pg_clipfrac",),
+    "clip_fraction_lower": ("actor/pg_clipfrac_lower",),
+    "clip_fraction_higher": (
+        "actor/pg_clipfrac_higher",
+        "actor/pg_clipfrac_upper",
+    ),
+    "learning_rate": ("actor/lr",),
+    "step_time": ("timing_s/step", "perf/time_per_step"),
+    "generation_time": ("timing_s/gen", "timing_s/generate_sequences"),
+    "actor_update_time": ("timing_s/update_actor",),
+    "response_length": ("response_length/mean",),
+    "memory_allocated": (
+        "perf/max_memory_allocated_gb",
+        "actor/perf/max_memory_allocated_gb",
+    ),
+    "memory_reserved": (
+        "perf/max_memory_reserved_gb",
+        "actor/perf/max_memory_reserved_gb",
+    ),
+}
+
+CRITICAL_TB_METRICS = (
+    "policy_loss",
+    "reference_kl",
+    "policy_update_kl",
+    "entropy",
+    "grad_norm",
+    "clip_fraction",
+    "learning_rate",
+)
+
 
 def extract_tool_actions(text: str) -> list[str]:
     decoder = json.JSONDecoder()
@@ -142,6 +179,55 @@ def load_tensorboard(log_dir: Path) -> dict[str, list[tuple[int, float]]]:
     }
 
 
+def length_reward_diagnostics(
+    records: list[dict[str, object]],
+) -> dict[str, float]:
+    if not records:
+        return {}
+    pairs = [
+        (
+            len(str(record.get("output", ""))),
+            float(
+                record.get(
+                    "environment_reward",
+                    record.get("score", 0.0),
+                )
+            ),
+        )
+        for record in records
+    ]
+    lengths = [float(pair[0]) for pair in pairs]
+    rewards = [pair[1] for pair in pairs]
+    length_mean = mean(lengths)
+    reward_mean = mean(rewards)
+    covariance = mean(
+        (length - length_mean) * (reward - reward_mean)
+        for length, reward in zip(lengths, rewards, strict=True)
+    )
+    length_std = pstdev(lengths)
+    reward_std = pstdev(rewards)
+    correlation = (
+        covariance / (length_std * reward_std)
+        if length_std > 0 and reward_std > 0
+        else 0.0
+    )
+    ordered = sorted(pairs, key=lambda pair: pair[0])
+    quartile_count = max(1, len(ordered) // 4)
+    shortest_reward = mean(
+        reward for _, reward in ordered[:quartile_count]
+    )
+    longest_reward = mean(
+        reward for _, reward in ordered[-quartile_count:]
+    )
+    return {
+        "mean_output_chars": length_mean,
+        "reward_length_pearson": correlation,
+        "shortest_quartile_reward": shortest_reward,
+        "longest_quartile_reward": longest_reward,
+        "long_minus_short_reward": longest_reward - shortest_reward,
+    }
+
+
 def load_rollouts(
     rollout_dir: Path,
 ) -> tuple[dict[int, dict[str, float]], dict[str, dict[int, dict[str, float]]]]:
@@ -158,7 +244,14 @@ def load_rollouts(
         "environment_reward",
         "hard_gate",
         "final_action_correct",
+        "tool_results_support_final",
+        "tool_result_conflict",
         "required_tool_rate",
+        "process_compliant",
+        "repeated_tool_call",
+        "repeated_tool_call_count",
+        "tool_order_violation",
+        "eligibility_before_slots_complete",
         "material_check_called",
         "risk_check_called",
         "premature_submit",
@@ -168,11 +261,17 @@ def load_rollouts(
         "decision_gate",
         "process_gate",
         "illegal_action",
+        "illegal_action_count",
+        "illegal_action_attempt_rate",
+        "trailing_action_count",
+        "trailing_action_rate",
         "invalid_slot_question",
         "max_steps_exceeded",
         "judge_score",
         "judge_used",
         "judge_fallback_used",
+        "judge_skipped_hard_gate",
+        "judge_empty_message",
         "judge_clarity",
         "judge_reason_completeness",
         "judge_actionability",
@@ -195,18 +294,68 @@ def load_rollouts(
             for record in records
         ]
         summary["reward_std"] = pstdev(rewards) if len(rewards) > 1 else 0.0
+        summary.update(length_reward_diagnostics(records))
         grouped: dict[str, list[float]] = defaultdict(list)
         for record, reward in zip(records, rewards):
             grouped[str(record.get("case_id", "unknown"))].append(reward)
-        group_stds = [pstdev(values) for values in grouped.values() if len(values) > 1]
+        group_stds = [
+            pstdev(values) if len(values) > 1 else 0.0
+            for values in grouped.values()
+        ]
+        informative_groups = sum(value > 1e-12 for value in group_stds)
         summary["group_count"] = float(len(grouped))
         summary["group_reward_std"] = mean(group_stds) if group_stds else 0.0
         summary["zero_variance_group_rate"] = (
             mean(float(value <= 1e-12) for value in group_stds) if group_stds else 1.0
         )
+        summary["informative_group_count"] = float(informative_groups)
+        summary["informative_group_rate"] = (
+            informative_groups / max(1, len(grouped))
+        )
+        summary["informative_trajectory_count"] = float(
+            sum(
+                len(values)
+                for values, group_std in zip(
+                    grouped.values(), group_stds, strict=True
+                )
+                if group_std > 1e-12
+            )
+        )
         group_records: dict[str, list[dict[str, object]]] = defaultdict(list)
         for record in records:
             group_records[str(record.get("case_id", "unknown"))].append(record)
+        unique_output_rates = []
+        identical_output_groups = []
+        for items in group_records.values():
+            normalized = {
+                " ".join(str(item.get("output", "")).split())
+                for item in items
+            }
+            unique_output_rates.append(len(normalized) / len(items))
+            identical_output_groups.append(
+                float(len(items) > 1 and len(normalized) == 1)
+            )
+        summary["unique_output_rate"] = mean(unique_output_rates)
+        summary["identical_output_group_rate"] = mean(
+            identical_output_groups
+        )
+        summary["safe_success_at_1"] = mean(
+            float(item.get("final_action_correct", 0.0)) > 0
+            and float(item.get("hard_gate", 0.0)) == 0
+            for item in records
+        )
+        summary["process_success_at_1"] = mean(
+            float(item.get("final_action_correct", 0.0)) > 0
+            and float(item.get("hard_gate", 0.0)) == 0
+            and float(
+                item.get(
+                    "process_compliant",
+                    float(item.get("required_tool_rate", 0.0)) >= 1.0,
+                )
+            )
+            >= 1.0
+            for item in records
+        )
         summary["success_at_k"] = mean(
             any(float(item.get("final_action_correct", 0.0)) > 0 for item in items)
             for items in group_records.values()
@@ -223,7 +372,13 @@ def load_rollouts(
             any(
                 float(item.get("final_action_correct", 0.0)) > 0
                 and float(item.get("hard_gate", 0.0)) == 0
-                and float(item.get("required_tool_rate", 0.0)) >= 1.0
+                and float(
+                    item.get(
+                        "process_compliant",
+                        float(item.get("required_tool_rate", 0.0)) >= 1.0,
+                    )
+                )
+                >= 1.0
                 for item in items
             )
             for items in group_records.values()
@@ -262,6 +417,7 @@ def load_rollouts(
         for record in records:
             by_scenario[str(record.get("scenario_type", "unknown"))].append(record)
         for scenario, items in by_scenario.items():
+            length_diagnostics = length_reward_diagnostics(items)
             scenarios[scenario][step] = {
                 "count": float(len(items)),
                 "mean_reward": mean(
@@ -271,12 +427,107 @@ def load_rollouts(
                 "pass_at_1": mean(
                     float(item.get("final_action_correct", 0.0)) for item in items
                 ),
+                "safe_pass_at_1": mean(
+                    float(item.get("final_action_correct", 0.0)) > 0
+                    and float(item.get("hard_gate", 0.0)) == 0
+                    for item in items
+                ),
+                "process_pass_at_1": mean(
+                    float(item.get("final_action_correct", 0.0)) > 0
+                    and float(item.get("hard_gate", 0.0)) == 0
+                    and float(
+                        item.get(
+                            "process_compliant",
+                            float(item.get("required_tool_rate", 0.0))
+                            >= 1.0,
+                        )
+                    )
+                    >= 1.0
+                    for item in items
+                ),
                 "hard_gate_failure_rate": mean(
                     float(item.get("hard_gate", 0.0)) for item in items
                 ),
                 "unsafe_submit_rate": mean(
                     float(item.get("unsafe_submit", 0.0)) for item in items
                 ),
+                "tool_result_conflict_rate": mean(
+                    float(item.get("tool_result_conflict", 0.0)) for item in items
+                ),
+                "required_tool_rate": mean(
+                    float(item.get("required_tool_rate", 0.0)) for item in items
+                ),
+                "process_compliance_rate": mean(
+                    float(
+                        item.get(
+                            "process_compliant",
+                            float(item.get("required_tool_rate", 0.0)) >= 1.0,
+                        )
+                    )
+                    for item in items
+                ),
+                "repeated_tool_call_rate": mean(
+                    float(item.get("repeated_tool_call", 0.0)) for item in items
+                ),
+                "tool_order_violation_rate": mean(
+                    float(item.get("tool_order_violation", 0.0)) for item in items
+                ),
+                "early_eligibility_rate": mean(
+                    float(item.get("eligibility_before_slots_complete", 0.0))
+                    for item in items
+                ),
+                "max_steps_exceeded_rate": mean(
+                    float(item.get("max_steps_exceeded", 0.0)) for item in items
+                ),
+                "mean_rounds": mean(
+                    float(item.get("rounds", 0.0)) for item in items
+                ),
+                "unique_output_rate": mean(
+                    len(
+                        {
+                            " ".join(str(row.get("output", "")).split())
+                            for row in case_items
+                        }
+                    )
+                    / len(case_items)
+                    for case_items in (
+                        [
+                            row
+                            for row in items
+                            if str(row.get("case_id", "unknown")) == case_id
+                        ]
+                        for case_id in {
+                            str(row.get("case_id", "unknown"))
+                            for row in items
+                        }
+                    )
+                ),
+                "identical_output_group_rate": mean(
+                    float(
+                        len(case_items) > 1
+                        and len(
+                            {
+                                " ".join(
+                                    str(row.get("output", "")).split()
+                                )
+                                for row in case_items
+                            }
+                        )
+                        == 1
+                    )
+                    for case_items in (
+                        [
+                            row
+                            for row in items
+                            if str(row.get("case_id", "unknown")) == case_id
+                        ]
+                        for case_id in {
+                            str(row.get("case_id", "unknown"))
+                            for row in items
+                        }
+                    )
+                ),
+                **length_diagnostics,
             }
     return result, dict(scenarios)
 
@@ -398,6 +649,29 @@ def _tb(scalars: dict[str, list[tuple[int, float]]], tag: str) -> list[tuple[int
     return scalars.get(tag, [])
 
 
+def resolve_tensorboard_metrics(
+    scalars: dict[str, list[tuple[int, float]]],
+) -> tuple[dict[str, list[tuple[int, float]]], dict[str, object]]:
+    resolved: dict[str, list[tuple[int, float]]] = {}
+    resolved_tags: dict[str, str | None] = {}
+    for metric, aliases in TB_TAG_ALIASES.items():
+        selected = next((tag for tag in aliases if scalars.get(tag)), None)
+        resolved_tags[metric] = selected
+        resolved[metric] = [] if selected is None else scalars[selected]
+    missing = [
+        metric for metric in CRITICAL_TB_METRICS if not resolved.get(metric)
+    ]
+    coverage: dict[str, object] = {
+        "resolved_tags": resolved_tags,
+        "point_counts": {
+            metric: len(values) for metric, values in resolved.items()
+        },
+        "missing_critical_metrics": missing,
+        "available_tags": sorted(scalars),
+    }
+    return resolved, coverage
+
+
 def _rollout(metrics: dict[int, dict[str, float]], name: str) -> list[tuple[int, float]]:
     return [(step, values[name]) for step, values in sorted(metrics.items()) if name in values]
 
@@ -417,6 +691,11 @@ def main() -> None:
     parser.add_argument("--experiment", required=True)
     parser.add_argument("--project-dir", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--out-dir", type=Path)
+    parser.add_argument(
+        "--require-critical-metrics",
+        action="store_true",
+        help="Exit non-zero after exporting diagnostics if core GRPO TB curves are missing.",
+    )
     args = parser.parse_args()
 
     project_dir = args.project_dir.resolve()
@@ -427,8 +706,47 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     scalars = load_tensorboard(log_dir)
+    tb_metrics, tb_coverage = resolve_tensorboard_metrics(scalars)
     rollouts, scenarios = load_rollouts(rollout_dir)
     validations, validation_scenarios = load_rollouts(validation_dir)
+    manifest_path = (
+        project_dir / "runs" / args.experiment / "run_manifest.json"
+    )
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        training = manifest.get("training", {})
+        expected_groups = float(training.get("train_batch_size", 0))
+        expected_trajectories = expected_groups * float(
+            training.get("rollout_n", 0)
+        )
+        if expected_groups > 0 and expected_trajectories > 0:
+            gen_batch_size = float(
+                training.get("gen_batch_size", expected_groups)
+            )
+            filter_enabled = bool(
+                training.get("filter_groups_enable", False)
+            )
+            max_gen_batches = float(
+                training.get("filter_max_gen_batches", 1)
+            )
+            configured_batch_ratio = gen_batch_size / expected_groups
+            configured_cap = (
+                configured_batch_ratio * max_gen_batches
+                if filter_enabled
+                else 1.0
+            )
+            for values in rollouts.values():
+                values["generated_group_multiplier"] = (
+                    values.get("group_count", 0.0) / expected_groups
+                )
+                values["generated_trajectory_multiplier"] = (
+                    values.get("rollout_count", 0.0)
+                    / expected_trajectories
+                )
+                values["configured_gen_batch_ratio"] = (
+                    configured_batch_ratio
+                )
+                values["configured_generation_cap"] = configured_cap
     write_tensorboard_csv(out_dir / "tensorboard_scalars.csv", scalars)
     write_rollout_csv(out_dir / "rollout_metrics.csv", rollouts)
     write_scenario_csv(out_dir / "scenario_metrics.csv", scenarios)
@@ -451,7 +769,17 @@ def main() -> None:
                 [
                     ("hard-gate failure", _rollout(rollouts, "hard_gate"), COLORS["red"]),
                     ("final action", _rollout(rollouts, "final_action_correct"), COLORS["blue"]),
+                    (
+                        "tool-result consistency",
+                        _rollout(rollouts, "tool_results_support_final"),
+                        COLORS["green"],
+                    ),
                     ("required tools", _rollout(rollouts, "required_tool_rate"), COLORS["cyan"]),
+                    (
+                        "process compliant",
+                        _rollout(rollouts, "process_compliant"),
+                        COLORS["yellow"],
+                    ),
                     ("judge coverage", _rollout(rollouts, "judge_used"), COLORS["purple"]),
                 ],
             ),
@@ -460,6 +788,21 @@ def main() -> None:
                 [
                     ("unsafe submit", _rollout(rollouts, "unsafe_submit"), COLORS["red"]),
                     ("premature submit", _rollout(rollouts, "premature_submit"), COLORS["orange"]),
+                    (
+                        "tool-result conflict",
+                        _rollout(rollouts, "tool_result_conflict"),
+                        COLORS["purple"],
+                    ),
+                    (
+                        "tool order violation",
+                        _rollout(rollouts, "tool_order_violation"),
+                        COLORS["yellow"],
+                    ),
+                    (
+                        "repeated tool call",
+                        _rollout(rollouts, "repeated_tool_call"),
+                        COLORS["cyan"],
+                    ),
                 ],
             ),
         ],
@@ -482,7 +825,41 @@ def main() -> None:
                         "zero-variance group rate",
                         _rollout(rollouts, "zero_variance_group_rate"),
                         COLORS["red"],
-                    )
+                    ),
+                    (
+                        "informative group rate",
+                        _rollout(rollouts, "informative_group_rate"),
+                        COLORS["green"],
+                    ),
+                ],
+            ),
+            (
+                "Dynamic-sampling cost",
+                [
+                    (
+                        "dumped group multiplier",
+                        _rollout(
+                            rollouts,
+                            "generated_group_multiplier",
+                        ),
+                        COLORS["orange"],
+                    ),
+                    (
+                        "configured gen-batch ratio",
+                        _rollout(
+                            rollouts,
+                            "configured_gen_batch_ratio",
+                        ),
+                        COLORS["purple"],
+                    ),
+                    (
+                        "configured generation cap",
+                        _rollout(
+                            rollouts,
+                            "configured_generation_cap",
+                        ),
+                        COLORS["red"],
+                    ),
                 ],
             ),
             (
@@ -502,6 +879,16 @@ def main() -> None:
             (
                 "Group success coverage",
                 [
+                    (
+                        "safe success@1",
+                        _rollout(rollouts, "safe_success_at_1"),
+                        COLORS["yellow"],
+                    ),
+                    (
+                        "process success@1",
+                        _rollout(rollouts, "process_success_at_1"),
+                        COLORS["purple"],
+                    ),
                     ("success@k", _rollout(rollouts, "success_at_k"), COLORS["blue"]),
                     (
                         "safe success@k",
@@ -535,6 +922,21 @@ def main() -> None:
                 ],
             ),
             (
+                "Within-case rollout diversity",
+                [
+                    (
+                        "unique output rate",
+                        _rollout(rollouts, "unique_output_rate"),
+                        COLORS["green"],
+                    ),
+                    (
+                        "identical-output groups",
+                        _rollout(rollouts, "identical_output_group_rate"),
+                        COLORS["red"],
+                    ),
+                ],
+            ),
+            (
                 "Premature final-answer diagnostics",
                 [
                     (
@@ -551,6 +953,16 @@ def main() -> None:
                         "tool-call format error rate",
                         _rollout(rollouts, "tool_call_format_error_rate"),
                         COLORS["yellow"],
+                    ),
+                    (
+                        "illegal action attempt rate",
+                        _rollout(rollouts, "illegal_action_attempt_rate"),
+                        COLORS["red"],
+                    ),
+                    (
+                        "trailing action rate",
+                        _rollout(rollouts, "trailing_action_rate"),
+                        COLORS["green"],
                     ),
                     (
                         "final-action share",
@@ -597,6 +1009,24 @@ def main() -> None:
                 [
                     ("overall score", _rollout(rollouts, "judge_score"), COLORS["purple"]),
                     ("coverage", _rollout(rollouts, "judge_used"), COLORS["red"]),
+                    (
+                        "fallback",
+                        _rollout(rollouts, "judge_fallback_used"),
+                        COLORS["orange"],
+                    ),
+                    (
+                        "skipped by hard gate",
+                        _rollout(
+                            rollouts,
+                            "judge_skipped_hard_gate",
+                        ),
+                        COLORS["cyan"],
+                    ),
+                    (
+                        "empty final message",
+                        _rollout(rollouts, "judge_empty_message"),
+                        COLORS["yellow"],
+                    ),
                 ],
             ),
         ],
@@ -630,6 +1060,17 @@ def main() -> None:
                 ],
             ),
             (
+                "Process-compliant pass@1",
+                [
+                    (
+                        name,
+                        _scenario(scenarios, name, "process_pass_at_1"),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+            (
                 "Hard-gate failure rate",
                 [
                     (
@@ -638,6 +1079,105 @@ def main() -> None:
                         scenario_colors[i % 6],
                     )
                     for i, name in enumerate(scenario_names)
+                ],
+            ),
+        ],
+    )
+    save_dashboard(
+        out_dir / "horizon_metrics.png",
+        f"Horizon pressure diagnostics - {args.experiment}",
+        [
+            (
+                "Mean action attempts by scenario",
+                [
+                    (
+                        name,
+                        _scenario(scenarios, name, "mean_rounds"),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+            (
+                "Max-steps exceeded by scenario",
+                [
+                    (
+                        name,
+                        _scenario(scenarios, name, "max_steps_exceeded_rate"),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(scenario_names)
+                ],
+            ),
+            (
+                "Overall horizon pressure",
+                [
+                    ("mean action attempts", _rollout(rollouts, "rounds"), COLORS["blue"]),
+                    (
+                        "max-steps exceeded",
+                        _rollout(rollouts, "max_steps_exceeded"),
+                        COLORS["red"],
+                    ),
+                ],
+            ),
+        ],
+    )
+    save_dashboard(
+        out_dir / "length_bias_metrics.png",
+        f"Response-length bias diagnostics - {args.experiment}",
+        [
+            (
+                "Mean serialized output length",
+                [
+                    (
+                        "train rollout chars",
+                        _rollout(rollouts, "mean_output_chars"),
+                        COLORS["blue"],
+                    ),
+                    (
+                        "validation chars",
+                        _rollout(validations, "mean_output_chars"),
+                        COLORS["green"],
+                    ),
+                ],
+            ),
+            (
+                "Pearson correlation: length vs reward",
+                [
+                    (
+                        "train correlation",
+                        _rollout(rollouts, "reward_length_pearson"),
+                        COLORS["purple"],
+                    ),
+                    (
+                        "validation correlation",
+                        _rollout(
+                            validations,
+                            "reward_length_pearson",
+                        ),
+                        COLORS["orange"],
+                    ),
+                ],
+            ),
+            (
+                "Longest minus shortest quartile reward",
+                [
+                    (
+                        "train reward gap",
+                        _rollout(
+                            rollouts,
+                            "long_minus_short_reward",
+                        ),
+                        COLORS["red"],
+                    ),
+                    (
+                        "validation reward gap",
+                        _rollout(
+                            validations,
+                            "long_minus_short_reward",
+                        ),
+                        COLORS["cyan"],
+                    ),
                 ],
             ),
         ],
@@ -661,6 +1201,29 @@ def main() -> None:
                 [
                     ("hard-gate failure", _rollout(validations, "hard_gate"), COLORS["red"]),
                     ("unsafe submit", _rollout(validations, "unsafe_submit"), COLORS["orange"]),
+                    (
+                        "tool-result conflict",
+                        _rollout(validations, "tool_result_conflict"),
+                        COLORS["purple"],
+                    ),
+                ],
+            ),
+            (
+                "Validation rollout diversity",
+                [
+                    (
+                        "unique output rate",
+                        _rollout(validations, "unique_output_rate"),
+                        COLORS["green"],
+                    ),
+                    (
+                        "identical-output groups",
+                        _rollout(
+                            validations,
+                            "identical_output_group_rate",
+                        ),
+                        COLORS["red"],
+                    ),
                 ],
             ),
             (
@@ -674,6 +1237,21 @@ def main() -> None:
                     for i, name in enumerate(validation_names)
                 ],
             ),
+            (
+                "Scenario validation process pass@1",
+                [
+                    (
+                        name,
+                        _scenario(
+                            validation_scenarios,
+                            name,
+                            "process_pass_at_1",
+                        ),
+                        scenario_colors[i % 6],
+                    )
+                    for i, name in enumerate(validation_names)
+                ],
+            ),
         ],
     )
     save_dashboard(
@@ -681,24 +1259,34 @@ def main() -> None:
         f"GRPO optimization - {args.experiment}",
         [
             (
-                "Policy losses",
+                "Policy objective",
                 [
-                    ("actor loss", _tb(scalars, "actor/loss"), COLORS["blue"]),
-                    ("policy loss", _tb(scalars, "actor/pg_loss"), COLORS["orange"]),
+                    ("policy loss", tb_metrics["policy_loss"], COLORS["orange"]),
+                    ("entropy", tb_metrics["entropy"], COLORS["green"]),
                 ],
             ),
             (
-                "KL and entropy",
+                "Reference and update KL",
                 [
-                    ("KL loss", _tb(scalars, "actor/kl_loss"), COLORS["red"]),
-                    ("entropy", _tb(scalars, "actor/entropy"), COLORS["green"]),
+                    ("reference KL loss", tb_metrics["reference_kl"], COLORS["red"]),
+                    ("policy-update KL", tb_metrics["policy_update_kl"], COLORS["blue"]),
                 ],
             ),
             (
                 "Gradient and clipping",
                 [
-                    ("grad norm", _tb(scalars, "actor/grad_norm"), COLORS["purple"]),
-                    ("clip fraction", _tb(scalars, "actor/pg_clipfrac"), COLORS["cyan"]),
+                    ("grad norm", tb_metrics["grad_norm"], COLORS["purple"]),
+                    ("clip fraction", tb_metrics["clip_fraction"], COLORS["cyan"]),
+                    (
+                        "lower clip fraction",
+                        tb_metrics["clip_fraction_lower"],
+                        COLORS["yellow"],
+                    ),
+                    (
+                        "higher clip fraction",
+                        tb_metrics["clip_fraction_higher"],
+                        COLORS["orange"],
+                    ),
                 ],
             ),
         ],
@@ -710,33 +1298,41 @@ def main() -> None:
             (
                 "Time per step (seconds)",
                 [
-                    ("total", _tb(scalars, "timing_s/step"), COLORS["blue"]),
-                    ("generation", _tb(scalars, "timing_s/gen"), COLORS["orange"]),
-                    ("actor update", _tb(scalars, "timing_s/update_actor"), COLORS["green"]),
+                    ("total", tb_metrics["step_time"], COLORS["blue"]),
+                    ("generation", tb_metrics["generation_time"], COLORS["orange"]),
+                    ("actor update", tb_metrics["actor_update_time"], COLORS["green"]),
                 ],
             ),
             (
                 "Response length (tokens)",
-                [("mean", _tb(scalars, "response_length/mean"), COLORS["purple"])],
+                [("mean", tb_metrics["response_length"], COLORS["purple"])],
             ),
             (
                 "Actor GPU memory (GB)",
                 [
-                    ("allocated", _tb(scalars, "actor/perf/max_memory_allocated_gb"), COLORS["red"]),
-                    ("reserved", _tb(scalars, "actor/perf/max_memory_reserved_gb"), COLORS["cyan"]),
+                    ("allocated", tb_metrics["memory_allocated"], COLORS["red"]),
+                    ("reserved", tb_metrics["memory_reserved"], COLORS["cyan"]),
                 ],
             ),
         ],
     )
 
+    (out_dir / "tensorboard_metric_coverage.json").write_text(
+        json.dumps(tb_coverage, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     summary = {
         "experiment": args.experiment,
         "tensorboard_tags": len(scalars),
         "rollout_steps": len(rollouts),
         "last_step": max(rollouts, default=0),
         "validation_steps": len(validations),
+        "missing_critical_tensorboard_metrics": tb_coverage[
+            "missing_critical_metrics"
+        ],
         "artifacts": [
             "tensorboard_scalars.csv",
+            "tensorboard_metric_coverage.json",
             "rollout_metrics.csv",
             "scenario_metrics.csv",
             "validation_metrics.csv",
@@ -746,6 +1342,8 @@ def main() -> None:
             "exploration_coverage_metrics.png",
             "judge_rubric_metrics.png",
             "scenario_metrics.png",
+            "horizon_metrics.png",
+            "length_bias_metrics.png",
             "validation_metrics.png",
             "optimization_metrics.png",
             "efficiency_metrics.png",
@@ -755,6 +1353,11 @@ def main() -> None:
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(summary, ensure_ascii=False))
+    if (
+        args.require_critical_metrics
+        and tb_coverage["missing_critical_metrics"]
+    ):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

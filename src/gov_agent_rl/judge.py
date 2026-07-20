@@ -243,6 +243,7 @@ def judge_expression_detailed(
         payload["rubric_version"] = RUBRIC_VERSION
         payload["model"] = model
         payload["score"] = score
+        payload["source"] = "qwen"
         cache.put(key, score, payload)
         return score, payload
     except Exception as exc:

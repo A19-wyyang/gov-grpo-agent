@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from gov_agent_rl.judge import RUBRIC, judge_expression_detailed
+from gov_agent_rl.fingerprints import case_fingerprint
 from gov_agent_rl.rewarding import score_trajectory_dict
 from gov_agent_rl.schema import ActionName
 
@@ -116,18 +117,44 @@ def compute_score(
             final_action = str(action["action"])
             final_message = str(action.get("message", ""))
             break
-    judge_result = judge_expression_detailed(
-        user_request=str(case.get("user_request", "")),
-        final_action=final_action,
-        message=final_message,
-        cache_path=Path(
-            os.getenv("GOV_JUDGE_CACHE", "runs/judge/qwen_expression.sqlite3")
-        ),
+    trajectory = {
+        "steps": [{"action": action} for action in actions],
+        "expression_score": 0.0,
+    }
+    preliminary = score_trajectory_dict(case, trajectory)
+    judge_skipped_hard_gate = bool(preliminary.hard_gate)
+    judge_empty_message = bool(
+        final_action and not final_message.strip()
+    )
+    judge_result = None
+    if not judge_skipped_hard_gate:
+        judge_result = judge_expression_detailed(
+            user_request=str(case.get("user_request", "")),
+            final_action=final_action,
+            message=final_message,
+            cache_path=Path(
+                os.getenv(
+                    "GOV_JUDGE_CACHE",
+                    "runs/judge/qwen_expression.sqlite3",
+                )
+            ),
+        )
+    judge_payload = {} if judge_result is None else judge_result[1]
+    judge_source = str(judge_payload.get("source", "qwen"))
+    judge_empty_message = bool(
+        judge_empty_message
+        or (
+            judge_result is not None
+            and judge_source == "empty-message"
+        )
     )
     judge_score = None if judge_result is None else judge_result[0]
+    judge_used = bool(judge_result is not None and not judge_empty_message)
+    judge_fallback_used = bool(
+        judge_result is None and not judge_skipped_hard_gate
+    )
     judge_fallback_score = float(os.getenv("GOV_JUDGE_FAILURE_SCORE", "0.0"))
     expression_score = judge_score if judge_score is not None else judge_fallback_score
-    judge_payload = {} if judge_result is None else judge_result[1]
     judge_dimensions = judge_payload.get("dimensions", {})
     judge_metrics: dict[str, float] = {}
     for name in RUBRIC:
@@ -137,21 +164,28 @@ def compute_score(
             judge_metrics[f"judge_{name}"] = float(raw_score) / 4.0
         except (TypeError, ValueError):
             judge_metrics[f"judge_{name}"] = -1.0
-    breakdown = score_trajectory_dict(
-        case,
-        {
-            "steps": [{"action": action} for action in actions],
-            "expression_score": expression_score,
-        },
+    breakdown = (
+        preliminary
+        if judge_skipped_hard_gate
+        else score_trajectory_dict(
+            case,
+            {
+                **trajectory,
+                "expression_score": expression_score,
+            },
+        )
     )
     return {
         "score": breakdown.total,
         "case_id": case["case_id"],
+        "case_fingerprint": case_fingerprint(case),
         "scenario_type": case.get("scenario_type", "unknown"),
         "environment_reward": breakdown.total,
         "judge_score": -1.0 if judge_score is None else judge_score,
-        "judge_used": float(judge_score is not None),
-        "judge_fallback_used": float(judge_score is None),
+        "judge_used": float(judge_used),
+        "judge_fallback_used": float(judge_fallback_used),
+        "judge_skipped_hard_gate": float(judge_skipped_hard_gate),
+        "judge_empty_message": float(judge_empty_message),
         **judge_metrics,
         "hard_gate": float(breakdown.hard_gate),
         "parsed_action_count": len(actions),

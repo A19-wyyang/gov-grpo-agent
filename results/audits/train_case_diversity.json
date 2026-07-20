@@ -1,0 +1,441 @@
+{
+  "count": 800,
+  "visible_unique": 526,
+  "full_unique": 800,
+  "minimum_group_visible_unique_rate": 1.0,
+  "minimum_group_full_unique_rate": 1.0,
+  "groups": [
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "birth_registration",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "business_registration",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "flexible_employment_subsidy",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "graduate_living_subsidy",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "household_migration",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "provident_fund_withdrawal_rent",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "adversarial",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "ineligible",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "missing_information",
+      "count": 20,
+      "visible_unique": 20,
+      "visible_unique_rate": 1.0,
+      "full_unique": 20,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "missing_material",
+      "count": 15,
+      "visible_unique": 15,
+      "visible_unique_rate": 1.0,
+      "full_unique": 15,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "risk",
+      "count": 10,
+      "visible_unique": 10,
+      "visible_unique_rate": 1.0,
+      "full_unique": 10,
+      "full_unique_rate": 1.0
+    },
+    {
+      "matter_id": "residence_permit_endorsement",
+      "scenario_type": "success",
+      "count": 25,
+      "visible_unique": 25,
+      "visible_unique_rate": 1.0,
+      "full_unique": 25,
+      "full_unique_rate": 1.0
+    }
+  ]
+}

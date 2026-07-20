@@ -1,0 +1,252 @@
+{
+  "count": 800,
+  "conflict_count": 20,
+  "conflicts_by_matter": {
+    "provident_fund_loan": 20
+  },
+  "conflicts_by_scenario": {
+    "ineligible": 20
+  },
+  "conflicts": [
+    {
+      "case_id": "provident_fund_loan_ineligible_009",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_002",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_015",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_012",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_017",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_014",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_000",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_016",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_006",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_013",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_019",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_011",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_005",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_010",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_008",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_004",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_003",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_007",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_001",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    },
+    {
+      "case_id": "provident_fund_loan_ineligible_018",
+      "matter_id": "provident_fund_loan",
+      "scenario_type": "ineligible",
+      "expected": "REFUSE",
+      "derived": "SUBMIT",
+      "checks": {
+        "eligible": true,
+        "materials_complete": true,
+        "risk_passed": true
+      }
+    }
+  ]
+}

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from typing import Any
 
 from .schema import ActionName, CaseSpec, EpisodeStep, StructuredAction
+
+VERIFICATION_ORDER = (
+    ActionName.POLICY_SEARCH,
+    ActionName.ELIGIBILITY_CHECK,
+    ActionName.MATERIAL_CHECK,
+    ActionName.RISK_CHECK,
+)
 
 
 def _compare(actual: Any, operator: str, expected: Any) -> bool:
@@ -29,7 +37,11 @@ class GovernmentServiceEpisode:
         self.tool_results: dict[str, Any] = {}
         self.asked_slots: list[str] = []
         self.failure_tags: list[str] = []
+        self.failure_counts: Counter[str] = Counter()
         self.steps: list[EpisodeStep] = []
+        self.attempt_history: list[dict[str, Any]] = []
+        self.trailing_actions: list[dict[str, Any]] = []
+        self.action_attempts = 0
         self.final_action: ActionName | None = None
         self.final_message = ""
         self.done = False
@@ -47,8 +59,19 @@ class GovernmentServiceEpisode:
 
     def execute(self, action_input: StructuredAction | dict[str, Any]) -> dict[str, Any]:
         if self.done:
+            self.trailing_actions.append(self._serialize_action(action_input))
             self._failure("action_after_done")
             return {"ok": False, "error": "episode already finished"}
+        if self.action_attempts >= self.max_steps:
+            self._failure("max_steps_exceeded")
+            self.done = True
+            self.final_action = ActionName.REFUSE
+            self.final_message = "办理轮次已超限，转人工处理。"
+            return {"ok": False, "done": True, "error": "max steps exceeded"}
+
+        self.action_attempts += 1
+        raw_action = self._serialize_action(action_input)
+        self.attempt_history.append(raw_action)
         try:
             action = (
                 action_input
@@ -59,17 +82,10 @@ class GovernmentServiceEpisode:
             self._failure("illegal_action")
             return self._record_invalid(action_input, str(exc))
 
-        if len(self.steps) >= self.max_steps:
-            self._failure("max_steps_exceeded")
-            self.done = True
-            self.final_action = ActionName.REFUSE
-            self.final_message = "办理轮次已超限，转人工处理。"
-            return {"ok": False, "done": True, "error": "max steps exceeded"}
-
         observation = self._dispatch(action)
         self.steps.append(
             EpisodeStep(
-                step=len(self.steps) + 1,
+                step=self.action_attempts,
                 action=action,
                 observation=observation,
                 known_slots=dict(self.known_slots),
@@ -107,7 +123,7 @@ class GovernmentServiceEpisode:
         return {"ok": True, "slot": slot, "value": value}
 
     def _policy_search(self, query: str) -> dict[str, Any]:
-        self.tool_history.append(ActionName.POLICY_SEARCH)
+        self._register_tool(ActionName.POLICY_SEARCH)
         result = {
             "matter_id": self.case.matter_id,
             "title": self.case.title,
@@ -121,7 +137,7 @@ class GovernmentServiceEpisode:
         return {"ok": True, **result}
 
     def _eligibility_check(self) -> dict[str, Any]:
-        self.tool_history.append(ActionName.ELIGIBILITY_CHECK)
+        self._register_tool(ActionName.ELIGIBILITY_CHECK)
         reasons: list[str] = []
         for slot in self.missing_slots:
             reasons.append(f"缺少必要信息：{slot}")
@@ -133,7 +149,7 @@ class GovernmentServiceEpisode:
         return {"ok": True, **result}
 
     def _material_check(self) -> dict[str, Any]:
-        self.tool_history.append(ActionName.MATERIAL_CHECK)
+        self._register_tool(ActionName.MATERIAL_CHECK)
         materials = dict(self.case.hidden_truth.get("materials", {}))
         missing = [name for name in self.case.rules.required_materials if not materials.get(name)]
         result = {"complete": not missing, "missing_materials": missing}
@@ -141,7 +157,7 @@ class GovernmentServiceEpisode:
         return {"ok": True, **result}
 
     def _risk_check(self) -> dict[str, Any]:
-        self.tool_history.append(ActionName.RISK_CHECK)
+        self._register_tool(ActionName.RISK_CHECK)
         truth = self.case.hidden_truth.get("risk_flags", [])
         active = [flag for flag in self.case.rules.risk_flags if flag in truth]
         result = {"passed": not active, "risk_flags": active, "risk_level": "high" if active else "low"}
@@ -172,7 +188,29 @@ class GovernmentServiceEpisode:
         # Invalid actions count toward the horizon but cannot terminate the episode.
         return observation
 
+    def _register_tool(self, action: ActionName) -> None:
+        if action in self.tool_history:
+            self._failure("repeated_tool_call")
+        position = VERIFICATION_ORDER.index(action)
+        if any(
+            predecessor not in self.tool_history
+            for predecessor in VERIFICATION_ORDER[:position]
+        ):
+            self._failure("tool_order_violation")
+        if action == ActionName.ELIGIBILITY_CHECK and self.missing_slots:
+            self._failure("eligibility_before_slots_complete")
+        self.tool_history.append(action)
+
+    @staticmethod
+    def _serialize_action(action_input: Any) -> dict[str, Any]:
+        if isinstance(action_input, StructuredAction):
+            return action_input.model_dump(mode="json")
+        if isinstance(action_input, dict):
+            return dict(action_input)
+        return {"raw_type": type(action_input).__name__}
+
     def _failure(self, tag: str) -> None:
+        self.failure_counts[tag] += 1
         if tag not in self.failure_tags:
             self.failure_tags.append(tag)
 
@@ -181,6 +219,9 @@ class GovernmentServiceEpisode:
             "case_id": self.case.case_id,
             "matter_id": self.case.matter_id,
             "steps": [step.model_dump(mode="json") for step in self.steps],
+            "attempts": [*self.attempt_history, *self.trailing_actions],
+            "action_attempts": self.action_attempts,
+            "trailing_action_count": len(self.trailing_actions),
             "tool_history": [item.value for item in self.tool_history],
             "failure_tags": list(self.failure_tags),
             "final_action": self.final_action.value if self.final_action else None,
